@@ -1,14 +1,38 @@
-.env
-.env.backup
-venv-new/
-venv-oi/
+# Debug/test files
+test_*.py
+check_*.py
+fix_*.py
+debug_*.py
+find_error*.py
+
+# Cleanup
 __pycache__/
 *.pyc
-*.mp3
-*.mp4
-*.jpg
-*.pt
+.venv/
+venv/
+.idea/
+.vscode/
+
+# Data
+logs/
 data/
-content/
-crew_output.txt
-client_secrets.json"error_log.txt" 
+*.log
+# Debug/test files
+test_*.py
+check_*.py
+fix_*.py
+debug_*.py
+find_error*.py
+
+# Cleanup
+__pycache__/
+*.pyc
+.venv/
+venv/
+.idea/
+.vscode/
+
+# Data
+logs/
+data/
+*.log

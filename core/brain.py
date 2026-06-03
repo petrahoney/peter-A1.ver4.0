@@ -7,7 +7,6 @@ The Luxury Strategist — Intelligence, Elevated.
 
 import os
 import sys
-sys.path.append("C:\\peter-ai")
 
 from dotenv import load_dotenv
 load_dotenv()

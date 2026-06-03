@@ -21,10 +21,20 @@ warnings.filterwarnings("ignore", category=ResourceWarning)
 
 load_dotenv()
 
-USER_NAME        = os.getenv("USER_NAME", "Tjerlang")
-ANTHROPIC_KEY    = os.getenv("ANTHROPIC_API_KEY", "")
-ELEVENLABS_KEY   = os.getenv("ELEVENLABS_API_KEY", "")
-ELEVENLABS_VOICE = os.getenv("ELEVENLABS_VOICE_ID", "TIXYCOMzK2Vw9OZovSLs")
+from config import (
+    USER_NAME,
+    ANTHROPIC_KEY,
+    ELEVENLABS_KEY,
+    ELEVENLABS_VOICE,
+    OLLAMA_URL,
+    LOCAL_MODE,
+    BASE_DIR,
+    DATA_DIR,
+    OUTPUT_DIR,
+    MEMORY_DIR,
+    FACES_DIR,
+    LOGS_DIR
+)
 
 ANTHROPIC_KEY    = os.getenv("ANTHROPIC_API_KEY", "")
 ELEVENLABS_KEY   = os.getenv("ELEVENLABS_API_KEY", "")
@@ -37,10 +47,10 @@ if not LOCAL_MODE and not ANTHROPIC_KEY:
     print("ERROR: ANTHROPIC_API_KEY tidak ditemukan!")
     sys.exit(1)
 
-os.makedirs("C:\\peter-ai\\data\\outputs", exist_ok=True)
-os.makedirs("C:\\peter-ai\\data\\memory",  exist_ok=True)
-os.makedirs("C:\\peter-ai\\data\\faces",   exist_ok=True)
-os.makedirs("C:\\peter-ai\\data\\logs",    exist_ok=True)
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+MEMORY_DIR.mkdir(parents=True, exist_ok=True)
+FACES_DIR.mkdir(parents=True, exist_ok=True)
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── Self-Heal ─────────────────────────────────────────────
 try:
