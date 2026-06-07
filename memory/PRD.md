@@ -218,5 +218,10 @@ Four cohesive additions; PETER is now a **portfolio of private councils**.
 - ✅ HTML `<meta description>` + OG tags + FastAPI app title updated.
 
 ## Next Action Items
-- Iteration 3 closed (Sparkline + Multi-language). Ready for user verification on /cost (4 sparkline cards) and any locale via the bottom-left switcher (try العربية for full RTL).
-- P2 backlog above; "translate remaining views" is the natural next i18n pass if user wants 100% coverage.
+- Iteration 3.1 closed (native preset suggestions per locale). Try `/chat` empty state under each language — prompts now feel native, not translated:
+  - **EN**: "Analyze the strategic risk of expanding into Europe in 2026."
+  - **ID**: "Apa peluang strategis pasar Indonesia di 2026?"
+  - **ZH**: "什么是《孙子兵法》中的「势」?"
+  - **ES**: "Define la estrategia de expansión en LATAM para 2026."
+  - **AR**: "ما الفرص الاستراتيجية في دول الخليج لعام 2026؟"
+- P2 backlog above; translating Home / Router / Crew / Memory / Workspaces body copy is the natural next sweep.

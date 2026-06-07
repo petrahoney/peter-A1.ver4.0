@@ -32,9 +32,9 @@
     "auto": "Auto",
     "howMayIAssist": "¿En qué puedo ayudarle?",
     "subtitle": "Pregunte cualquier cosa — un cálculo, una definición, una revisión estratégica profunda. PETER elige el modelo correcto en milisegundos.",
-    "suggest1": "¿Qué hora es en Tokio?",
-    "suggest2": "Analiza el riesgo estratégico de expandirse a Europa en 2026.",
-    "suggest3": "Define la diferencia entre OOP y FP.",
+    "suggest1": "Define la estrategia de expansión en LATAM para 2026.",
+    "suggest2": "¿Cuál es el riesgo real de adoptar IA generativa hoy?",
+    "suggest3": "Explica la diferencia entre estrategia y táctica en dos líneas.",
     "rename": "Renombrar",
     "delete": "Eliminar",
     "confirmDelete": "¿Eliminar \"{{title}}\"?"

@@ -33,8 +33,8 @@
     "howMayIAssist": "How may I assist?",
     "subtitle": "Ask anything — a calculation, a definition, a deep strategy review. PETER picks the right model in milliseconds.",
     "suggest1": "What time is it in Tokyo?",
-    "suggest2": "Analyze the strategic risk of expanding to Europe in 2026.",
-    "suggest3": "Define the difference between OOP and FP.",
+    "suggest2": "Analyze the strategic risk of expanding into Europe in 2026.",
+    "suggest3": "Define the difference between strategy and tactics — in two lines.",
     "rename": "Rename",
     "delete": "Delete",
     "confirmDelete": "Delete \"{{title}}\"?"
