@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import ReactFlow, {
   Background,
   Controls,
@@ -32,7 +33,7 @@ function AgentNode({ data }) {
   const isRunning = data.status === "running";
   return (
     <div
-      className={`px-4 py-3 rounded-md min-w-[200px] transition-all duration-300 ${
+      className={`px-4 py-3 rounded-md w-[220px] transition-all duration-300 ${
         data.selected
           ? "bg-peter-navy2 border-2 border-peter-gold shadow-gold"
           : isRunning
@@ -58,8 +59,8 @@ function AgentNode({ data }) {
           {data.tier}
         </div>
       </div>
-      <div className="h-display text-lg text-peter-ivory mt-1">{data.role}</div>
-      <div className="text-[10px] text-peter-dim mt-0.5 truncate">{data.goal}</div>
+      <div className="h-display text-base text-peter-ivory mt-1 leading-tight">{data.role}</div>
+      <div className="text-[10px] text-peter-dim mt-1 leading-snug line-clamp-2">{data.goal}</div>
     </div>
   );
 }
@@ -67,6 +68,7 @@ function AgentNode({ data }) {
 const nodeTypes = { agent: AgentNode };
 
 export default function CrewView() {
+  const { t } = useTranslation();
   const [blueprint, setBlueprint] = useState([]);
   const [reqs, setReqs] = useState("");
   const [runId, setRunId] = useState(null);
@@ -109,10 +111,12 @@ export default function CrewView() {
   const agentList = run?.agents || blueprint.map((a) => ({ ...a, status: "pending" }));
 
   const nodes = useMemo(() => {
+    // Wider horizontal/vertical spacing so 4-per-row × 220px cards never collide
+    // even on narrow embedded previews. fitView in the canvas auto-scales them.
     return agentList.map((a, i) => ({
       id: a.id,
       type: "agent",
-      position: { x: (i % 4) * 250, y: Math.floor(i / 4) * 160 },
+      position: { x: (i % 4) * 280, y: Math.floor(i / 4) * 200 },
       data: {
         ...a,
         selected: i === selectedIdx,
@@ -158,14 +162,13 @@ export default function CrewView() {
   return (
     <div className="p-12">
       <div className="text-[11px] tracking-[0.32em] uppercase text-peter-dim">
-        CrewAI App Builder
+        {t("crew.label")}
       </div>
       <h1 className="h-display text-4xl text-peter-ivory mt-1">
-        Seven minds, <em className="text-peter-gold not-italic">one mandate</em>
+        {t("crew.title")} <em className="text-peter-gold not-italic">{t("crew.titleAccent")}</em>
       </h1>
       <p className="text-peter-ivory/70 mt-3 max-w-3xl text-sm font-light leading-relaxed">
-        Describe what you want built. Architect, DBA, Backend, Frontend, QA, DevOps and
-        Documenter take the brief in sequence — each on the cheapest capable model.
+        {t("crew.subtitle")}
       </p>
 
       <div className="mt-8 flex gap-3">
@@ -173,7 +176,7 @@ export default function CrewView() {
           value={reqs}
           onChange={(e) => setReqs(e.target.value)}
           rows={2}
-          placeholder="e.g. A subscription-based AI note-taking app for legal teams with audit logs."
+          placeholder={t("crew.placeholder")}
           data-testid="crew-requirements-input"
           className="flex-1 bg-peter-navy2 border border-peter-gold/25 focus:border-peter-gold/60 outline-none text-peter-ivory px-4 py-3 rounded-md font-light resize-none"
         />
@@ -183,7 +186,7 @@ export default function CrewView() {
           data-testid="crew-start-btn"
           className="bg-peter-gold disabled:opacity-40 text-peter-black hover:bg-peter-goldLight transition-colors px-6 py-3 rounded-md font-medium self-stretch"
         >
-          {run?.status === "running" ? "Building…" : "Dispatch crew"}
+          {run?.status === "running" ? t("crew.building") : t("crew.dispatch")}
         </button>
       </div>
 
@@ -234,7 +237,7 @@ export default function CrewView() {
               </div>
               <div className="hairline my-4" />
               <div className="text-[10px] tracking-[0.3em] uppercase text-peter-dim mb-2">
-                Output
+                {t("crew.output")}
               </div>
               <div
                 className="flex-1 overflow-y-auto text-xs text-peter-ivory/90 font-light leading-relaxed pr-1"
@@ -243,11 +246,11 @@ export default function CrewView() {
                 {selected.output ? (
                   <Markdown>{selected.output}</Markdown>
                 ) : selected.status === "running" ? (
-                  <span className="italic">Thinking…</span>
+                  <span className="italic">{t("crew.thinking")}</span>
                 ) : selected.status === "pending" ? (
-                  <span className="italic text-peter-dim">Awaiting upstream context.</span>
+                  <span className="italic text-peter-dim">{t("crew.awaitingContext")}</span>
                 ) : (
-                  <span className="italic text-peter-dim">No output yet.</span>
+                  <span className="italic text-peter-dim">{t("crew.noOutput")}</span>
                 )}
               </div>
               {(selected.cost_usd || selected.latency_ms) && (
@@ -274,13 +277,13 @@ export default function CrewView() {
         <div className="mt-4 flex flex-wrap gap-6 text-sm text-peter-ivory/80">
           <div>
             <span className="text-[10px] tracking-[0.3em] uppercase text-peter-dim mr-2">
-              Run
+              {t("crew.run")}
             </span>
             <span className="font-mono text-xs">{run.id.slice(0, 8)}</span>
           </div>
           <div>
             <span className="text-[10px] tracking-[0.3em] uppercase text-peter-dim mr-2">
-              Status
+              {t("crew.status")}
             </span>
             <span style={{ color: STATUS_COLOR[run.status] || "#C9A84C" }}>
               {run.status}
@@ -288,13 +291,13 @@ export default function CrewView() {
           </div>
           <div>
             <span className="text-[10px] tracking-[0.3em] uppercase text-peter-dim mr-2">
-              Total cost
+              {t("crew.totalCost")}
             </span>
             <span className="tnum">${(run.total_cost_usd || 0).toFixed(5)}</span>
           </div>
           <div>
             <span className="text-[10px] tracking-[0.3em] uppercase text-peter-dim mr-2">
-              Saved vs Premium
+              {t("crew.savedVsPremium")}
             </span>
             <span className="tnum text-peter-gold">
               ${(run.total_saved_usd || 0).toFixed(5)}
@@ -306,7 +309,7 @@ export default function CrewView() {
       {pastRuns.length ? (
         <div className="mt-10">
           <div className="text-[11px] tracking-[0.32em] uppercase text-peter-dim mb-3">
-            Recent dispatches
+            {t("crew.recent")}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {pastRuns.slice(0, 6).map((r) => (

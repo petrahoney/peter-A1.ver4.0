@@ -80,5 +80,65 @@
     "close": "Tutup",
     "save": "Simpan",
     "cancel": "Batal"
+  },
+  "home": {
+    "label": "Komando",
+    "title": "Intelligence,",
+    "titleAccent": "elevated.",
+    "subtitle": "Pusat komando sang ahli strategi. Routing cerdas di empat tingkat model, tim tujuh agen, dan memori jangka panjang — semuanya di bawah satu atap yang tenang.",
+    "fourTiers": "Empat Tingkat"
+  },
+  "router": {
+    "label": "Router AI",
+    "title": "Model terbaik yang termurah,",
+    "titleAccent": "setiap saat.",
+    "subtitle": "Klasifikasi pola + heuristik memilih salah satu dari empat tingkat dalam milidetik — tanpa panggilan LLM untuk routing. Klik tingkat mana pun untuk memeriksa model di baliknya.",
+    "userQuery": "Pertanyaan Pengguna",
+    "classifier": "Pengklasifikasi"
+  },
+  "crew": {
+    "label": "Pembangun Aplikasi CrewAI",
+    "title": "Tujuh pikiran,",
+    "titleAccent": "satu mandat.",
+    "subtitle": "Jelaskan apa yang ingin Anda bangun. Arsitek, DBA, Backend, Frontend, QA, DevOps, dan Pendokumentasi mengerjakan briefnya berurutan — masing-masing pada model termurah yang mampu.",
+    "placeholder": "mis. Aplikasi catatan AI berlangganan untuk tim hukum dengan jejak audit.",
+    "dispatch": "Kerahkan tim",
+    "building": "Membangun…",
+    "run": "Run",
+    "status": "Status",
+    "totalCost": "Total biaya",
+    "savedVsPremium": "Hemat vs Premium",
+    "recent": "Pengerahan terbaru",
+    "output": "Keluaran",
+    "awaitingContext": "Menunggu konteks sebelumnya.",
+    "thinking": "Berpikir…",
+    "noOutput": "Belum ada keluaran.",
+    "tier": "tingkat"
+  },
+  "memory": {
+    "label": "Memori Strategis",
+    "title": "Apa yang PETER",
+    "titleAccent": "ingat.",
+    "subtitle": "Recall vektor berbasis ChromaDB lintas setiap percakapan. Cari secara semantik, ajari PETER langsung, atau biarkan ekstraksi bekerja di latar belakang.",
+    "recallPlaceholder": "Recall semantik — mis. 'apa yang sedang dibangun pengguna?'",
+    "teachLabel": "Ajari PETER",
+    "forgetAll": "Lupakan semua",
+    "exportJson": "Ekspor JSON",
+    "listView": "Daftar",
+    "graphView": "Grafik",
+    "noMemories": "Belum ada memori."
+  },
+  "workspaces": {
+    "label": "Ruang Kerja Proyek",
+    "title": "Portofolio",
+    "titleAccent": "dewan pribadi.",
+    "subtitle": "Setiap ruang kerja punya memori, sesi, dan tim sendiri. Beralih konteks seperti ahli strategi mengganti kabinet — bersih, seketika.",
+    "newWorkspace": "Ruang kerja baru",
+    "memories": "memori",
+    "sessions": "sesi",
+    "crews": "tim",
+    "edit": "Sunting",
+    "deletePurge": "Hapus + bersihkan",
+    "deleteUntag": "Hapus (lepas tag konten)"
   }
 }

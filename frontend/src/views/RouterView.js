@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import ReactFlow, {
   Background,
   Controls,
@@ -81,6 +82,7 @@ const nodeTypes = {
 };
 
 export default function RouterView() {
+  const { t } = useTranslation();
   const [tierCatalog, setTierCatalog] = useState({});
   const [query, setQuery] = useState("");
   const [result, setResult] = useState(null);
@@ -182,14 +184,13 @@ export default function RouterView() {
   return (
     <div className="p-12">
       <div className="text-[11px] tracking-[0.32em] uppercase text-peter-dim">
-        Intelligent AI Router
+        {t("router.label")}
       </div>
       <h1 className="h-display text-4xl text-peter-ivory mt-1">
-        Routing as <em className="text-peter-gold not-italic">choreography</em>
+        {t("router.title")} <em className="text-peter-gold not-italic">{t("router.titleAccent")}</em>
       </h1>
       <p className="text-peter-ivory/70 mt-3 max-w-3xl text-sm font-light leading-relaxed">
-        Type a query and watch PETER classify it instantly — no LLM call required. The
-        active tier ignites; the rest dim. Every routing decision is auditable.
+        {t("router.subtitle")}
       </p>
 
       <div className="mt-8 flex flex-wrap gap-3 items-stretch">

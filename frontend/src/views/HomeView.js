@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import { ArrowRight, Sparkle, CurrencyDollar, Lightning } from "@phosphor-icons/react";
 import { Link } from "react-router-dom";
 import { stats, tiers } from "../lib/api";
@@ -18,6 +19,7 @@ function Stat({ label, value, sub }) {
 }
 
 export default function HomeView() {
+  const { t: i18nT } = useTranslation();
   const [s, setS] = useState(null);
   const [t, setT] = useState(null);
 
@@ -53,14 +55,12 @@ export default function HomeView() {
               v4.0 · The Luxury Strategist
             </div>
             <h1 className="h-display text-6xl md:text-7xl text-peter-ivory leading-[0.95]">
-              Intelligence,
+              {i18nT("home.title")}
               <br />
-              <span className="text-peter-gold italic font-normal">Elevated.</span>
+              <span className="text-peter-gold italic font-normal">{i18nT("home.titleAccent")}</span>
             </h1>
             <p className="mt-7 max-w-2xl text-peter-ivory/75 text-lg font-light leading-relaxed">
-              A sophisticated AI command center. Queries are classified in milliseconds and
-              routed to the cheapest capable model — local, mid-tier, or premium — while
-              a seven-agent crew can architect entire applications on demand.
+              {i18nT("home.subtitle")}
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
               <Link
@@ -109,7 +109,7 @@ export default function HomeView() {
       {/* Tier showcase */}
       <div className="px-14 mt-16">
         <div className="flex items-baseline justify-between mb-6">
-          <h2 className="h-display text-3xl text-peter-ivory">The Four Tiers</h2>
+          <h2 className="h-display text-3xl text-peter-ivory">{i18nT("home.fourTiers")}</h2>
           <div className="text-[10px] tracking-[0.32em] uppercase text-peter-dim">
             Cost-optimised routing
           </div>

@@ -80,5 +80,65 @@
     "close": "Cerrar",
     "save": "Guardar",
     "cancel": "Cancelar"
+  },
+  "home": {
+    "label": "Comando",
+    "title": "Intelligence,",
+    "titleAccent": "elevated.",
+    "subtitle": "El centro de mando del estratega. Enrutamiento inteligente entre cuatro niveles de modelo, una tripulación de siete agentes y memoria de largo plazo — todo bajo un mismo techo sereno.",
+    "fourTiers": "Los Cuatro Niveles"
+  },
+  "router": {
+    "label": "Enrutador de IA",
+    "title": "El modelo capaz más barato,",
+    "titleAccent": "siempre.",
+    "subtitle": "Un clasificador de patrones + heurística elige uno de los cuatro niveles en milisegundos — sin llamada a un LLM para enrutar. Haz clic en cualquier nivel para inspeccionar el modelo detrás.",
+    "userQuery": "Consulta del usuario",
+    "classifier": "Clasificador"
+  },
+  "crew": {
+    "label": "Constructor CrewAI",
+    "title": "Siete mentes,",
+    "titleAccent": "un mandato.",
+    "subtitle": "Describe lo que quieres construir. Arquitecto, DBA, Backend, Frontend, QA, DevOps y Documentador toman el brief en secuencia — cada uno con el modelo capaz más barato.",
+    "placeholder": "p. ej. Una app de notas con IA por suscripción para equipos legales con registros de auditoría.",
+    "dispatch": "Desplegar equipo",
+    "building": "Construyendo…",
+    "run": "Ejecución",
+    "status": "Estado",
+    "totalCost": "Coste total",
+    "savedVsPremium": "Ahorrado vs Premium",
+    "recent": "Despliegues recientes",
+    "output": "Salida",
+    "awaitingContext": "Esperando contexto previo.",
+    "thinking": "Pensando…",
+    "noOutput": "Aún sin salida.",
+    "tier": "nivel"
+  },
+  "memory": {
+    "label": "Memoria del Estratega",
+    "title": "Lo que PETER",
+    "titleAccent": "recuerda.",
+    "subtitle": "Recall vectorial con ChromaDB a través de cada conversación. Busca semánticamente, enseña a PETER directamente o deja que la extracción trabaje en segundo plano.",
+    "recallPlaceholder": "Recall semántico — p. ej. «¿qué está construyendo el usuario?»",
+    "teachLabel": "Enseña a PETER",
+    "forgetAll": "Olvidar todo",
+    "exportJson": "Exportar JSON",
+    "listView": "Lista",
+    "graphView": "Grafo",
+    "noMemories": "Sin memorias aún."
+  },
+  "workspaces": {
+    "label": "Espacios de Proyecto",
+    "title": "Cartera de",
+    "titleAccent": "consejos privados.",
+    "subtitle": "Cada espacio tiene su propia memoria, sesiones y trabajos de equipo. Cambia de contexto como un estratega cambia de gabinete — limpio, al instante.",
+    "newWorkspace": "Nuevo espacio",
+    "memories": "memorias",
+    "sessions": "sesiones",
+    "crews": "equipos",
+    "edit": "Editar",
+    "deletePurge": "Eliminar + purgar",
+    "deleteUntag": "Eliminar (quitar etiquetas)"
   }
 }

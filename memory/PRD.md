@@ -27,7 +27,23 @@ Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi
 | SMART     | Claude Sonnet 4.5          | claude-sonnet-4-5-20250929    | anthropic  | 0.0150 |
 | CRITICAL  | Claude Opus 4.5            | claude-opus-4-5-20251101      | anthropic  | 0.1500 |
 
-## Implemented (v4.3 · 8-Jun-2026 — Floating Session Translator)
+## Implemented (v4.4 · 8-Jun-2026 — Crew/Switcher Fixes + View Body i18n)
+
+### Bug fixes
+- ✅ **Crew Builder card overlap** — `AgentNode` now has a fixed 220px width with `line-clamp-2` on the goal text. Node positions widened to `(i%4)*280, floor(i/4)*200` so cards never collide on narrow embedded previews.
+- ✅ **LanguageSwitcher clipping** — in `variant="sidebar"` the dropdown now opens **upward** (`bottom-full mb-1.5`) instead of falling into the footer area. Menu also scrollable (`max-h-[260px] overflow-y-auto`) for safety. All 5 languages always reachable.
+
+### View body translations
+- ✅ Added `home / router / crew / memory / workspaces` namespaces with title + subtitle + button labels in EN / ID / ZH / ES / AR (culturally-resonant phrasing, not literal).
+- ✅ Wired into HomeView (hero title + subtitle + "Four Tiers"), RouterView (label/title/subtitle), CrewView (full header + button + Output / Thinking / Awaiting context / Run / Status / Total cost / Saved vs Premium / Recent dispatches), MemoryView (label + title), WorkspacesView (label + title + subtitle + "New workspace" button).
+
+### Still EN-only (logged to P2)
+- Backend `AGENT_BLUEPRINT` (agent role names + goals) returned from `/api/agents` — needs server-side i18n keys keyed by locale header, or a frontend mapping table.
+- Crew agent `status` enum (`pending|running|done|error`) — same upstream.
+- Past dispatches grid: requirements text (user input), timestamps.
+- Settings tier catalog body text (`purpose` field).
+
+
 
 ### Backend
 - ✅ New `reply_lang` Optional[str] on the session schema; accepted via PATCH `/api/sessions/{id}` (values: `en|id|zh|es|ar`, `""` clears). Echoed by GET sessions list + GET messages.
@@ -128,6 +144,12 @@ Five prompts in user message #347 audited and closed.
 ### Integration test (Prompt 5)
 - TTFT **22 ms** (target < 500 ms)
 - Stats badge, sidebar (11 sessions), Workspaces (2 cards), Memory List/Graph, Export, Memory toggle — all green.
+
+## Implemented (v4.3 · 8-Jun-2026 — Floating Session Translator)
+- ✅ Per-session `reply_lang` override (PATCH `/api/sessions/{id}` accepts en|id|zh|es|ar).
+- ✅ `apply_reply_lang()` injects a user-preference directive into chat messages for that session.
+- ✅ Sidebar `Globe` icon on rows whose detected language ≠ UI; click opens inline popover with "Reply in {{ui_native}}" action. Persistent `🌐 EN` badge on overridden sessions.
+
 
 ## Implemented (v4.2 · 8-Jun-2026 — "Did you mean…?" Language Drift Hint)
 - ✅ Zero-dep client-side detector `/app/frontend/src/lib/detectLang.js` — Unicode script ranges + stoplist scoring for 5 locales.
@@ -281,5 +303,5 @@ Four cohesive additions; PETER is now a **portfolio of private councils**.
 - ✅ HTML `<meta description>` + OG tags + FastAPI app title updated.
 
 ## Next Action Items
-- Iteration 5 closed (Floating Session Translator). Try it: switch UI to English → notice 🌐 icon on the Chinese / Spanish session rows → click → tap "Reply in English".
-- P2 backlog: translate Home / Router / Crew / Memory / Workspaces body copy; per-session system-prompt versioning; WorkspaceSelector outside-click close; React Router v7 future flags; "Clear reply_lang" UX on the badge itself (currently only via PATCH `reply_lang=""`).
+- Iteration 6 closed (Crew overlap + Switcher upward + View body i18n). User can now switch UI to any of the 5 locales and see translated headlines / subtitles / buttons across Home / Router / Crew / Memory / Workspaces / Cost / Chat / Settings.
+- P2 backlog: backend i18n for `/api/agents` (role names + goals + status enum); Settings tier `purpose` text; per-session system-prompt versioning; WorkspaceSelector outside-click close; React Router v7 future flags; "Clear override" UX on the EN/ID/ZH/ES/AR badge.

@@ -80,5 +80,65 @@
     "close": "Close",
     "save": "Save",
     "cancel": "Cancel"
+  },
+  "home": {
+    "label": "Command",
+    "title": "Intelligence,",
+    "titleAccent": "elevated.",
+    "subtitle": "The strategist's command center. Intelligent routing across four model tiers, a seven-agent build crew, and long-form memory — all under one quiet roof.",
+    "fourTiers": "The Four Tiers"
+  },
+  "router": {
+    "label": "AI Router",
+    "title": "Cheapest capable",
+    "titleAccent": "model, every time.",
+    "subtitle": "Pattern + heuristic classifier picks one of four tiers in milliseconds — no LLM call to route. Click any tier to inspect the model behind it.",
+    "userQuery": "User Query",
+    "classifier": "Classifier"
+  },
+  "crew": {
+    "label": "CrewAI App Builder",
+    "title": "Seven minds,",
+    "titleAccent": "one mandate.",
+    "subtitle": "Describe what you want built. Architect, DBA, Backend, Frontend, QA, DevOps and Documenter take the brief in sequence — each on the cheapest capable model.",
+    "placeholder": "e.g. A subscription-based AI note-taking app for legal teams with audit logs.",
+    "dispatch": "Dispatch crew",
+    "building": "Building…",
+    "run": "Run",
+    "status": "Status",
+    "totalCost": "Total cost",
+    "savedVsPremium": "Saved vs Premium",
+    "recent": "Recent dispatches",
+    "output": "Output",
+    "awaitingContext": "Awaiting upstream context.",
+    "thinking": "Thinking…",
+    "noOutput": "No output yet.",
+    "tier": "tier"
+  },
+  "memory": {
+    "label": "Strategist Memory",
+    "title": "What PETER",
+    "titleAccent": "remembers.",
+    "subtitle": "ChromaDB-backed vector recall across every conversation. Search semantically, teach PETER directly, or let extraction work in the background.",
+    "recallPlaceholder": "Semantic recall — e.g. 'what is the user building?'",
+    "teachLabel": "Teach PETER",
+    "forgetAll": "Forget all",
+    "exportJson": "Export JSON",
+    "listView": "List",
+    "graphView": "Graph",
+    "noMemories": "No memories yet."
+  },
+  "workspaces": {
+    "label": "Project Workspaces",
+    "title": "Portfolio of",
+    "titleAccent": "private councils.",
+    "subtitle": "Each workspace gets its own memory, sessions and crew runs. Switch contexts the way a strategist switches cabinets — cleanly, instantly.",
+    "newWorkspace": "New workspace",
+    "memories": "memories",
+    "sessions": "sessions",
+    "crews": "crews",
+    "edit": "Edit",
+    "deletePurge": "Delete + purge",
+    "deleteUntag": "Delete (untag content)"
   }
 }

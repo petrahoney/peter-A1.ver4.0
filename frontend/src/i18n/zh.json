@@ -80,5 +80,65 @@
     "close": "关闭",
     "save": "保存",
     "cancel": "取消"
+  },
+  "home": {
+    "label": "指挥中心",
+    "title": "智能,",
+    "titleAccent": "升华。",
+    "subtitle": "策略师的指挥中心。四层模型智能路由、七位智能体团队、长期记忆 — 尽在同一片静谧之地。",
+    "fourTiers": "四个层级"
+  },
+  "router": {
+    "label": "AI 路由器",
+    "title": "最便宜的胜任之选,",
+    "titleAccent": "每一次。",
+    "subtitle": "模式与启发式分类器在毫秒内选择四个层级之一 — 路由无需调用 LLM。点击任意层级查看其背后的模型。",
+    "userQuery": "用户提问",
+    "classifier": "分类器"
+  },
+  "crew": {
+    "label": "CrewAI 应用构建器",
+    "title": "七位智者,",
+    "titleAccent": "一项使命。",
+    "subtitle": "描述你想构建的东西。架构师、数据库工程师、后端、前端、QA、DevOps 和文档师依序接手 — 每位都使用最便宜的胜任模型。",
+    "placeholder": "例如:为法律团队的订阅式 AI 笔记应用,带审计日志。",
+    "dispatch": "派遣团队",
+    "building": "构建中…",
+    "run": "运行",
+    "status": "状态",
+    "totalCost": "总成本",
+    "savedVsPremium": "对比 Premium 节省",
+    "recent": "最近派遣",
+    "output": "输出",
+    "awaitingContext": "等待上游上下文。",
+    "thinking": "思考中…",
+    "noOutput": "暂无输出。",
+    "tier": "层级"
+  },
+  "memory": {
+    "label": "策略师记忆",
+    "title": "PETER",
+    "titleAccent": "记得什么。",
+    "subtitle": "基于 ChromaDB 的向量记忆贯穿每段对话。语义搜索、直接教导 PETER,或让自动提取在后台运作。",
+    "recallPlaceholder": "语义召回 — 例如「用户正在构建什么?」",
+    "teachLabel": "教导 PETER",
+    "forgetAll": "全部遗忘",
+    "exportJson": "导出 JSON",
+    "listView": "列表",
+    "graphView": "图谱",
+    "noMemories": "暂无记忆。"
+  },
+  "workspaces": {
+    "label": "项目工作区",
+    "title": "私人议会",
+    "titleAccent": "组合。",
+    "subtitle": "每个工作区拥有独立的记忆、会话与团队任务。像策略师切换内阁那样切换上下文 — 干净、即时。",
+    "newWorkspace": "新工作区",
+    "memories": "记忆",
+    "sessions": "会话",
+    "crews": "团队",
+    "edit": "编辑",
+    "deletePurge": "删除 + 清除内容",
+    "deleteUntag": "删除(解除内容标签)"
   }
 }

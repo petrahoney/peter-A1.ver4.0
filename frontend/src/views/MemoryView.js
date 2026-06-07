@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Brain,
   Plus,
@@ -197,6 +198,7 @@ function MemoryGraph({ workspaceId, memories }) {
 }
 
 export default function MemoryView() {
+  const { t } = useTranslation();
   const { active, activeId } = useWorkspace();
   const [memories, setMemories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -328,7 +330,7 @@ export default function MemoryView() {
         <div>
           <div className="text-[11px] tracking-[0.32em] uppercase text-peter-dim flex items-center gap-2">
             <Brain size={14} weight="light" />
-            Strategist Memory
+            {t("memory.label")}
             {active ? (
               <span
                 className="ml-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm border text-[9px] tracking-widest"
@@ -341,7 +343,7 @@ export default function MemoryView() {
             ) : null}
           </div>
           <h1 className="h-display text-4xl text-peter-ivory mt-1">
-            The <em className="text-peter-gold not-italic">long-form</em> mind
+            {t("memory.title")} <em className="text-peter-gold not-italic">{t("memory.titleAccent")}</em>
           </h1>
         </div>
         <div className="flex items-end gap-6">

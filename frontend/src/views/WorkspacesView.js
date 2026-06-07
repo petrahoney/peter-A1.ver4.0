@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Stack,
   Plus,
@@ -199,6 +200,7 @@ function WorkspaceForm({ initial, onSave, onCancel }) {
 }
 
 export default function WorkspacesView() {
+  const { t } = useTranslation();
   const { activeId, setActive, refresh: refreshCtx } = useWorkspace();
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -265,15 +267,13 @@ export default function WorkspacesView() {
         <div>
           <div className="text-[11px] tracking-[0.32em] uppercase text-peter-dim flex items-center gap-2">
             <Stack size={14} weight="light" />
-            Project Workspaces
+            {t("workspaces.label")}
           </div>
           <h1 className="h-display text-4xl text-peter-ivory mt-1">
-            A portfolio of <em className="text-peter-gold not-italic">private councils</em>
+            {t("workspaces.title")} <em className="text-peter-gold not-italic">{t("workspaces.titleAccent")}</em>
           </h1>
           <p className="text-peter-ivory/70 mt-3 max-w-3xl text-sm font-light leading-relaxed">
-            Each workspace pins its own memories, sessions and crew artefacts. Switch
-            workspaces from the sidebar — PETER&rsquo;s recall, chat history and crew runs
-            scope automatically.
+            {t("workspaces.subtitle")}
           </p>
         </div>
         <button
@@ -284,7 +284,7 @@ export default function WorkspacesView() {
           data-testid="workspace-new-btn"
           className="bg-peter-gold text-peter-black hover:bg-peter-goldLight transition-colors px-5 py-3 rounded-md font-medium inline-flex items-center gap-2"
         >
-          <Plus size={16} weight="bold" /> New workspace
+          <Plus size={16} weight="bold" /> {t("workspaces.newWorkspace")}
         </button>
       </div>
 

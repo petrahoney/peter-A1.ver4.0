@@ -67,31 +67,35 @@ export default function LanguageSwitcher({ variant = "sidebar" }) {
 
       {open ? (
         <div
-          className="absolute z-40 mt-1.5 w-full min-w-[180px] bg-peter-black/95 border border-peter-gold/30 rounded-md shadow-lg backdrop-blur-md overflow-hidden"
+          className={`absolute z-40 w-full min-w-[180px] bg-peter-black/95 border border-peter-gold/30 rounded-md shadow-lg backdrop-blur-md overflow-hidden ${
+            variant === "sidebar" ? "bottom-full mb-1.5" : "mt-1.5"
+          }`}
           data-testid="lang-switcher-menu"
         >
-          {LANGUAGES.map((l) => (
-            <button
-              key={l.code}
-              type="button"
-              onClick={() => choose(l.code)}
-              data-testid={`lang-option-${l.code}`}
-              className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 transition-colors ${
-                l.code === current.code
-                  ? "bg-peter-gold/15 text-peter-gold"
-                  : "text-peter-ivory hover:bg-peter-navy2/60"
-              }`}
-              dir={l.dir}
-            >
-              <span className="flex-1">
-                <span className="font-medium">{l.native}</span>
-                <span className="text-peter-dim/70 ml-2 text-[10px]">{l.label}</span>
-              </span>
-              {l.code === current.code ? (
-                <Check size={12} weight="bold" className="text-peter-gold" />
-              ) : null}
-            </button>
-          ))}
+          <div className="max-h-[260px] overflow-y-auto">
+            {LANGUAGES.map((l) => (
+              <button
+                key={l.code}
+                type="button"
+                onClick={() => choose(l.code)}
+                data-testid={`lang-option-${l.code}`}
+                className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 transition-colors ${
+                  l.code === current.code
+                    ? "bg-peter-gold/15 text-peter-gold"
+                    : "text-peter-ivory hover:bg-peter-navy2/60"
+                }`}
+                dir={l.dir}
+              >
+                <span className="flex-1">
+                  <span className="font-medium">{l.native}</span>
+                  <span className="text-peter-dim/70 ml-2 text-[10px]">{l.label}</span>
+                </span>
+                {l.code === current.code ? (
+                  <Check size={12} weight="bold" className="text-peter-gold" />
+                ) : null}
+              </button>
+            ))}
+          </div>
           <div className="px-3 py-2 text-[10px] text-peter-dim/70 border-t border-peter-gold/15">
             {t("settings.languageHint")}
           </div>
