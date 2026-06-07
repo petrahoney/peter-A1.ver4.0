@@ -10,6 +10,7 @@ import "reactflow/dist/style.css";
 import { motion } from "framer-motion";
 import { CheckCircle, CircleNotch, Circle, WarningCircle } from "@phosphor-icons/react";
 import { agents as listAgents, crewBuild, crewStatus, crewList } from "../lib/api";
+import Markdown from "../components/Markdown";
 
 const STATUS_ICON = {
   pending: Circle,
@@ -236,16 +237,18 @@ export default function CrewView() {
                 Output
               </div>
               <div
-                className="flex-1 overflow-y-auto text-xs text-peter-ivory/90 whitespace-pre-wrap font-light leading-relaxed pr-1"
+                className="flex-1 overflow-y-auto text-xs text-peter-ivory/90 font-light leading-relaxed pr-1"
                 data-testid="crew-agent-output"
               >
-                {selected.output
-                  ? selected.output
-                  : selected.status === "running"
-                  ? "Thinking…"
-                  : selected.status === "pending"
-                  ? "Awaiting upstream context."
-                  : "No output yet."}
+                {selected.output ? (
+                  <Markdown>{selected.output}</Markdown>
+                ) : selected.status === "running" ? (
+                  <span className="italic">Thinking…</span>
+                ) : selected.status === "pending" ? (
+                  <span className="italic text-peter-dim">Awaiting upstream context.</span>
+                ) : (
+                  <span className="italic text-peter-dim">No output yet.</span>
+                )}
               </div>
               {(selected.cost_usd || selected.latency_ms) && (
                 <div className="mt-3 flex gap-3 text-[10px] text-peter-dim tnum">

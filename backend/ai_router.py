@@ -122,6 +122,12 @@ class AIRouter:
     def classify_query(self, query: str) -> TaskComplexity:
         return self.classify_query_verbose(query)[0]
 
+    def drop_session(self, session_id: str) -> None:
+        """Remove cached LlmChat instances for a deleted session."""
+        for key in list(self._sessions.keys()):
+            if key[0] == session_id:
+                self._sessions.pop(key, None)
+
     def classify_query_verbose(
         self, query: str
     ) -> tuple[TaskComplexity, Optional[str]]:

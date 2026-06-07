@@ -27,6 +27,11 @@ Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi
 | SMART     | Claude Sonnet 4.5          | claude-sonnet-4-5-20250929    | anthropic  | 0.0150 |
 | CRITICAL  | Claude Opus 4.5            | claude-opus-4-5-20251101      | anthropic  | 0.1500 |
 
+## Implemented (v1.1 · 7-Jun-2026)
+- ✅ **Token-by-token SSE streaming** in chat (`/api/chat/stream` consumed via fetch+ReadableStream; live tier badge appears at first `route` event, deltas append, `done` finalises stats).
+- ✅ **Markdown rendering** for chat assistant replies and crew agent output (`react-markdown` + `remark-gfm`, fully styled with luxury theme — headings, code blocks, tables, blockquotes, lists).
+- ✅ **Session sidebar** with new / select / rename-in-place / delete (with confirm) in Chat view. Backend gained `PATCH /api/sessions/{id}` and `DELETE /api/sessions/{id}`, and the router drops in-memory LlmChat instances on session deletion.
+
 ## Implemented (v1.0 · 7-Jun-2026)
 - ✅ Hero command center with live aggregated stats and tier showcase.
 - ✅ Multi-turn chat with model badge (tier, model, cost, latency, saved).
@@ -47,15 +52,18 @@ Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi
 - `POST /api/chat/stream`            — SSE streaming variant
 - `GET  /api/sessions`               — list chat sessions
 - `GET  /api/sessions/{id}/messages` — chat history
+- `PATCH /api/sessions/{id}`         — rename session
+- `DELETE /api/sessions/{id}`        — delete session (+ messages)
 - `POST /api/crew/build`             — start 7-agent build
 - `GET  /api/crew/runs/{id}`         — poll status
 - `GET  /api/crew/runs`              — list past runs
 - `GET  /api/stats`                  — dashboard data
 
 ## Backlog (P1)
-- Streaming chat UI (token-by-token) — backend SSE already in place.
-- Markdown rendering in agent output and chat (currently plain).
-- Session sidebar with switch / rename / delete in Chat view.
+- ~~Streaming chat UI (token-by-token)~~ — done in v1.1.
+- ~~Markdown rendering in agent output and chat~~ — done in v1.1.
+- ~~Session sidebar with switch / rename / delete in Chat view~~ — done in v1.1.
+- "Stop streaming" button to abort mid-flight.
 
 ## Backlog (P2)
 - Real Ollama integration for FREE tier in preview (would require Ollama deploy).

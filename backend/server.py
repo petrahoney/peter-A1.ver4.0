@@ -193,6 +193,10 @@ async def chat(req: ChatRequest) -> dict[str, Any]:
     }
 
 
+class SessionRenameRequest(BaseModel):
+    title: str
+
+
 @app.get("/api/sessions")
 async def list_sessions() -> dict[str, Any]:
     cursor = db.sessions.find({}, sort=[("updated_at", -1)]).limit(50)
@@ -207,6 +211,33 @@ async def list_sessions() -> dict[str, Any]:
             }
         )
     return {"sessions": sessions}
+
+
+@app.patch("/api/sessions/{session_id}")
+async def rename_session(session_id: str, req: SessionRenameRequest) -> dict[str, Any]:
+    title = (req.title or "").strip()[:120]
+    if not title:
+        raise HTTPException(400, "title required")
+    result = await db.sessions.update_one(
+        {"_id": session_id}, {"$set": {"title": title, "updated_at": now_iso()}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(404, "session not found")
+    return {"id": session_id, "title": title}
+
+
+@app.delete("/api/sessions/{session_id}")
+async def delete_session(session_id: str) -> dict[str, Any]:
+    s = await db.sessions.find_one({"_id": session_id})
+    if not s:
+        raise HTTPException(404, "session not found")
+    await db.messages.delete_many({"session_id": session_id})
+    await db.sessions.delete_one({"_id": session_id})
+    # Also drop in-memory LlmChat instances for this session so a new
+    # session_id starts fresh.
+    router_engine.drop_session(session_id)
+    return {"id": session_id, "deleted": True}
+
 
 
 @app.get("/api/sessions/{session_id}/messages")
