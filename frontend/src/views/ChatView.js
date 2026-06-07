@@ -30,6 +30,8 @@ const TIER_COLORS = {
   critical: "#8B6914",
 };
 
+const LAST_TIER_KEY = "peter_ai.last_force_tier";
+
 function MessageBubble({ m, streaming }) {
   const isUser = m.role === "user";
   return (
@@ -165,6 +167,19 @@ function SessionItem({ s, active, onSelect, onRename, onDelete }) {
         </div>
       ) : (
         <div className="flex items-center gap-2">
+          <span
+            data-testid={`session-tier-dot-${s.id}`}
+            title={s.force_tier ? `Locked tier: ${s.force_tier.toUpperCase()}` : "Auto-routing"}
+            className="shrink-0 w-1.5 h-1.5 rounded-full"
+            style={{
+              backgroundColor: s.force_tier
+                ? TIER_COLORS[s.force_tier]
+                : "rgba(201,168,76,0.18)",
+              boxShadow: s.force_tier
+                ? `0 0 6px ${TIER_COLORS[s.force_tier]}99`
+                : "none",
+            }}
+          />
           <div className="flex-1 min-w-0">
             <div className="text-xs text-peter-ivory truncate font-light">
               {s.title || "Untitled"}
@@ -206,7 +221,13 @@ export default function ChatView() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sessionId, setSessionId] = useState(null);
-  const [forceTier, setForceTier] = useState("");
+  const [forceTier, setForceTier] = useState(() => {
+    try {
+      return localStorage.getItem(LAST_TIER_KEY) || "";
+    } catch {
+      return "";
+    }
+  });
   const [streaming, setStreaming] = useState(false);
   const [tierCatalog, setTierCatalog] = useState({});
   const [sessions, setSessions] = useState([]);
@@ -261,12 +282,24 @@ export default function ChatView() {
     if (abortRef.current) abortRef.current.abort();
     setSessionId(null);
     setMessages([]);
-    setForceTier("");
+    // Keep the user's last preference instead of resetting to Auto.
+    try {
+      const last = localStorage.getItem(LAST_TIER_KEY) || "";
+      setForceTier(last);
+    } catch {
+      /* silent */
+    }
   };
 
   const onForceTierChange = async (value) => {
     setForceTier(value);
-    // If we're already inside a session, persist the preference.
+    try {
+      if (value) localStorage.setItem(LAST_TIER_KEY, value);
+      else localStorage.removeItem(LAST_TIER_KEY);
+    } catch {
+      /* silent */
+    }
+    // If we're already inside a session, persist the preference server-side.
     if (sessionId) {
       try {
         await setSessionTier(sessionId, value);
