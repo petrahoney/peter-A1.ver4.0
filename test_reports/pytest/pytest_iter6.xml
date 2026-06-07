@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="6" skipped="0" tests="12" time="61.147" timestamp="2026-06-07T12:05:15.644985+00:00" hostname="agent-env-bb46549a-7036-436d-a511-db9f0fa66d70"><testcase classname="backend.tests.test_studio_stream_delete.TestSSEStream" name="test_sse_open_comment" time="60.212" /><testcase classname="backend.tests.test_studio_stream_delete.TestSSEStream" name="test_event_order" time="0.000"><failure message="AssertionError: assert 'iter_done' in ['start', 'iter_start']">backend/tests/test_studio_stream_delete.py:78: in test_event_order
+    assert "iter_done" in types
+E   AssertionError: assert 'iter_done' in ['start', 'iter_start']</failure></testcase><testcase classname="backend.tests.test_studio_stream_delete.TestSSEStream" name="test_start_payload" time="0.000" /><testcase classname="backend.tests.test_studio_stream_delete.TestSSEStream" name="test_iter_done_has_score" time="0.000"><failure message="StopIteration">backend/tests/test_studio_stream_delete.py:90: in test_iter_done_has_score
+    iter_done = next(e for e in streamed_prompt["events"] if e.get("type") == "iter_done")
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   StopIteration</failure></testcase><testcase classname="backend.tests.test_studio_stream_delete.TestSSEStream" name="test_final_result_indonesian" time="0.000"><failure message="AssertionError: no final.result frame&#10;assert None is not None">backend/tests/test_studio_stream_delete.py:97: in test_final_result_indonesian
+    assert fr is not None, "no final.result frame"
+E   AssertionError: no final.result frame
+E   assert None is not None</failure></testcase><testcase classname="backend.tests.test_studio_stream_delete.TestSSEStream" name="test_end_frame" time="0.000"><failure message="AssertionError: did not see 'event: end' frame&#10;assert False">backend/tests/test_studio_stream_delete.py:105: in test_end_frame
+    assert streamed_prompt["saw_end"], "did not see 'event: end' frame"
+E   AssertionError: did not see 'event: end' frame
+E   assert False</failure></testcase><testcase classname="backend.tests.test_studio_stream_delete.TestSSEStream" name="test_time_budget" time="0.000" /><testcase classname="backend.tests.test_studio_stream_delete.TestGeniusPromptDelete" name="test_prompt_appears_in_list" time="0.000"><failure message="TypeError: 'NoneType' object is not subscriptable">backend/tests/test_studio_stream_delete.py:114: in test_prompt_appears_in_list
+    pid = fr["id"]
+          ^^^^^^^^
+E   TypeError: 'NoneType' object is not subscriptable</failure></testcase><testcase classname="backend.tests.test_studio_stream_delete.TestGeniusPromptDelete" name="test_delete_prompt_and_404" time="0.000"><failure message="TypeError: 'NoneType' object is not subscriptable">backend/tests/test_studio_stream_delete.py:122: in test_delete_prompt_and_404
+    pid = fr["id"]
+          ^^^^^^^^
+E   TypeError: 'NoneType' object is not subscriptable</failure></testcase><testcase classname="backend.tests.test_studio_stream_delete.TestScriptsCRUD" name="test_scripts_list_shape" time="0.240" /><testcase classname="backend.tests.test_studio_stream_delete.TestScriptsCRUD" name="test_script_detail_and_delete" time="0.468" /><testcase classname="backend.tests.test_studio_stream_delete.TestScriptsCRUD" name="test_script_delete_404" time="0.110" /></testsuite></testsuites>

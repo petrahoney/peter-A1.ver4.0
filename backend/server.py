@@ -860,7 +860,13 @@ async def genius_prompt_generate(req: GeniusPromptRequest) -> dict[str, Any]:
 @app.post("/api/genius-prompt/stream")
 async def genius_prompt_stream(req: GeniusPromptRequest) -> StreamingResponse:
     """SSE variant — emits one `data:` line per iteration so the proxy stays
-    open during long multi-iteration runs (>100s)."""
+    open during long multi-iteration runs (>100s).
+
+    A 10-second heartbeat (`: heartbeat\\n\\n` comment frame) is interleaved
+    while LLM calls are in flight so the cluster ingress idle-timer never
+    trips. The heartbeat is a SSE comment (not a `data:` line), so clients
+    ignore it transparently.
+    """
 
     import json as _json
 
@@ -870,21 +876,41 @@ async def genius_prompt_stream(req: GeniusPromptRequest) -> StreamingResponse:
         yield b": studio-stream-open\n\n"
         final_payload: Optional[dict[str, Any]] = None
         errored = False
+
+        gen = studio_stream_genius_prompt(
+            req.topic, req.platform, req.style, req.target_score, req.iterations,
+            target_language=req.target_language,
+        )
+        # Race each generator step against a 10s heartbeat ticker so the
+        # proxy keeps seeing bytes while the LLM is thinking.
+        next_task: Optional[asyncio.Task] = asyncio.create_task(gen.__anext__())
         try:
-            async for event in studio_stream_genius_prompt(
-                req.topic, req.platform, req.style, req.target_score, req.iterations,
-                target_language=req.target_language,
-            ):
+            while True:
+                done, _ = await asyncio.wait({next_task}, timeout=10)
+                if not done:
+                    yield b": heartbeat\n\n"
+                    continue
+                try:
+                    event = next_task.result()
+                except StopAsyncIteration:
+                    break
+                except Exception as e:
+                    errored = True
+                    yield (
+                        f"data: {_json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
+                    ).encode("utf-8")
+                    break
+
                 if event.get("type") == "final":
                     final_payload = event.get("result")
                 if event.get("type") == "error":
                     errored = True
                 yield f"data: {_json.dumps(event, ensure_ascii=False)}\n\n".encode("utf-8")
-        except Exception as e:  # network / LLM transient failure
-            errored = True
-            yield (
-                f"data: {_json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
-            ).encode("utf-8")
+
+                next_task = asyncio.create_task(gen.__anext__())
+        finally:
+            if next_task and not next_task.done():
+                next_task.cancel()
 
         # Persist on the happy path only.
         if req.save and final_payload and not errored:
@@ -893,7 +919,6 @@ async def genius_prompt_stream(req: GeniusPromptRequest) -> StreamingResponse:
                 del doc["id"]
                 await db.genius_prompts.insert_one(doc)
             except Exception as e:
-                # Surface the persistence error so the UI can warn.
                 yield (
                     f"data: {_json.dumps({'type': 'warning', 'message': f'save_failed: {e}'}, ensure_ascii=False)}\n\n"
                 ).encode("utf-8")

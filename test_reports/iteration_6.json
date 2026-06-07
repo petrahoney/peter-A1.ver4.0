@@ -1,0 +1,59 @@
+{
+  "summary": "Iteration 6 — Re-test of SSE heartbeat fix for POST /api/genius-prompt/stream. RESULT: HEARTBEAT FIX DOES NOT RESOLVE THE PROXY TIMEOUT. The server.py event_source() wrapper now correctly emits `: heartbeat\\n\\n` comment frames every 10s (verified via raw curl — 5 heartbeats received between iter_start and the cut), but the cluster ingress STILL terminates the SSE connection at EXACTLY ~60.18s every time. The proxy enforces a HARD MAX-DURATION cap on streaming responses, NOT an idle timeout. Therefore iter_done / final / `event: end` frames never reach the client during a single ~80-110s LLM iteration. Saved-Library CRUD (DELETE /api/scripts, GET /api/scripts, 404 paths) all still pass. Frontend Live-Stream UX confirmed broken end-to-end: studio-stream-progress card renders with status 'Iteration 1 / 1' then silently disappears at ~60s without ever rendering stream-iter-1 or studio-genius-card.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/genius-prompt/stream",
+        "issue": "Proxy enforces a ~60s HARD max-duration on the SSE response, not an idle timeout. Heartbeats are being emitted and delivered correctly (curl observed 5 `: heartbeat` lines arriving at ~10s, 20s, 30s, 40s, 50s) but the connection is still severed at t=60.18s — long before the single iteration's iter_done (~80-110s). Therefore the heartbeat-based fix in server.py event_source() (asyncio.wait+timeout=10) does NOT solve the regression. The 6 previously-failing SSE assertions in test_studio_stream_delete.py still fail: test_event_order (no iter_done), test_iter_done_has_score (StopIteration), test_final_result_indonesian (no final.result frame), test_end_frame (no `event: end`), and the two delete-prompt-by-id tests that depend on final.result['id']. Reproduce: `curl -sN -X POST $URL/api/genius-prompt/stream -H 'Content-Type: application/json' -d '{\"topic\":\"Tips fokus saat WFH\",\"iterations\":1,\"target_language\":\"id\",\"target_score\":7.0,\"save\":false,\"platform\":\"tiktok\",\"style\":\"viral\"}'` → connection closes after exactly 60.18s with frames received in order: open-comment, start, iter_start, 5x heartbeat. HTTP status is 200 (server completes successfully on its side; the proxy just stops forwarding bytes).",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Live Stream UX on /studio (handleGenius → geniusPromptStream)",
+        "issue": "End-to-end test: filled topic='Tips fokus saat WFH', language='id' (Bahasa Indonesia), iterations=1, clicked Run genius-prompt loop. studio-stream-progress appeared at t=0s with status 'Iteration 1 / 1', BUT after the 60s proxy cut the entire stream-progress card disappeared (status testid returned no element at t=130s) and stream-iter-1 / studio-genius-card NEVER rendered. The user sees a silent failure with no error toast. This is a direct consequence of the backend SSE regression — the frontend code path is correct but receives no terminal events.",
+        "affected_selectors": ["studio-stream-progress", "studio-stream-status", "stream-iter-1", "studio-genius-card"]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "Studio /studio Live Stream",
+        "issues": [
+          "studio-stream-status text reads 'Iteration 1 / 1' (English) even when language=Bahasa Indonesia is selected — the spec/request expected 'Iterasi 1 / 1'. Localisation of this string is missing in StudioView.js.",
+          "When the SSE connection silently closes after 60s without iter_done, the UI shows no error/timeout indicator — the stream-progress card just vanishes. User sees nothing happen. Recommend surfacing an explicit timeout state with retry guidance."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_studio_stream_delete.py",
+    "/app/test_reports/pytest/pytest_iter6.xml"
+  ],
+  "action_items": [
+    "Heartbeats DO NOT FIX this — the proxy has a HARD max-duration limit (~60s), not an idle timeout. Recommended fixes (pick one): (1) JOB QUEUE PATTERN: change /api/genius-prompt/stream to a POST that returns {job_id} immediately (<1s), run the iteration in a background asyncio.Task, expose GET /api/genius-prompt/stream/{job_id} as a separate SSE endpoint that pulls events from an in-memory or Redis queue — each consumer SSE then completes quickly even if reconnected. Frontend reconnects on close. (2) WEBSOCKET: switch to a WebSocket route at /api/ws/genius-prompt — many cluster ingresses have separate (or no) timeout for WS connections. (3) CHUNKED POLLING: split each LLM phase into smaller cached steps; client polls GET /api/genius-prompt/progress/{job_id} every 5s and assembles the result.",
+    "Add language-aware copy in StudioView.js streamStatus: use 'Iterasi {i} / {n}' when target_language === 'id'.",
+    "Add a client-side watchdog: if SSE closes (or no event in 75s) without `final`, render an explicit timeout banner in the studio-stream-progress card instead of silently unmounting it.",
+    "Verify the actual cluster ingress timeout value (likely nginx-ingress proxy-read-timeout=60s or a similar SSE-specific cap) — if the deployment supports per-route annotations like `nginx.ingress.kubernetes.io/proxy-read-timeout: 300`, that would also unblock SSE, but it's deployment-side config and Kubernetes ingress in this preview environment may not honour it."
+  ],
+  "critical_code_review_comments": [
+    "server.py event_source() (lines 873-927) — heartbeat emission via asyncio.wait+timeout=10 is implemented correctly; curl confirms heartbeats every ~10s actually reach the client. The bug is NOT in this code — it's in the proxy layer above FastAPI. Conclusion: this approach cannot be patched further; the architecture needs to change (job-queue/WebSocket).",
+    "Even on the happy path, a single iteration takes ~80-110s of LLM work (3 sequential round-trips via _ask_json / generate_script / evaluate_script). This is fundamentally incompatible with a 60s proxy cap on a single HTTP response. Heartbeats addressed an *idle* timeout assumption that turned out not to apply here.",
+    "script_studio.py stream_genius_prompt() generator is unchanged from iter5 and is fine.",
+    "All Saved-Library CRUD endpoints (GET /api/scripts, GET /api/scripts/{id}, DELETE /api/scripts/{id}, DELETE /api/genius-prompts/{id}) — verified clean, no MongoDB _id leakage, proper 404 on missing resources. No regression there."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "50% (6/12 — same 6 SSE assertions failing as iter5; Saved Scripts CRUD all pass; SSE comment-line + start frame + time_budget pass)",
+    "frontend": "Saved-library delete UX still works. Live-Stream UX still broken (confirmed via Playwright: progress card vanishes silently at ~60s without rendering iter-1)."
+  },
+  "test_credentials": "Not required (no auth on these endpoints).",
+  "seed_data_creation": "None. Test consumed 1 saved-script + the streamed save attempt failed (no final frame, so no save persisted).",
+  "retest_needed": true,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "After main agent implements one of the recommended architectural fixes (job queue, WebSocket, or chunked polling), re-run test_studio_stream_delete.py. If switching to job-queue: tests will need to be rewritten to (a) POST and capture job_id, (b) consume the new SSE-by-job-id endpoint until terminal frame, (c) then validate the saved prompt. The 6 failing assertions remain the success criteria. Frontend re-test: same flow on /studio — expect studio-genius-card populated with Indonesian text and the stream-progress card never silently unmounting.",
+  "rca of the issue": "ROOT CAUSE: The cluster ingress / preview-environment reverse proxy enforces a HARD ~60 second maximum duration on a single streaming HTTP response. This is NOT an idle timeout — it is a wall-clock cap. CONFIRMATION: with the heartbeat fix in place, raw curl receives 5 heartbeat lines at ~10s intervals (so bytes ARE flowing) and the connection is still cut at t=60.18s. Therefore the heartbeat strategy (which addresses idle timeouts) is the wrong mitigation. The correct fix is architectural — decouple the long-running LLM job from the HTTP response: run it in a background task and use either (a) a short-lived SSE endpoint that streams cached events from a job queue and can be reconnected, (b) a WebSocket which the proxy treats differently, or (c) a polling pattern. The heartbeat code in server.py is harmless and can stay, but it does NOT solve this regression."
+}
