@@ -20,8 +20,10 @@ export const chat = (message, session_id, force_tier) =>
     .post("/chat", { message, session_id, force_tier })
     .then((r) => r.data);
 
-export const listSessions = () =>
-  api.get("/sessions").then((r) => r.data);
+export const listSessions = (workspace_id) => {
+  const q = workspace_id ? `?workspace_id=${encodeURIComponent(workspace_id)}` : "";
+  return api.get(`/sessions${q}`).then((r) => r.data);
+};
 
 export const getMessages = (session_id) =>
   api.get(`/sessions/${session_id}/messages`).then((r) => r.data);
@@ -40,6 +42,24 @@ export const renameSession = (session_id, title) =>
 
 export const setSessionTier = (session_id, force_tier) =>
   api.patch(`/sessions/${session_id}`, { force_tier: force_tier || "" }).then((r) => r.data);
+
+export const setSessionMemoryEnabled = (session_id, memory_enabled) =>
+  api.patch(`/sessions/${session_id}`, { memory_enabled }).then((r) => r.data);
+
+export const setSessionWorkspace = (session_id, workspace_id) =>
+  api.patch(`/sessions/${session_id}`, { workspace_id: workspace_id || "" }).then((r) => r.data);
+
+export const listWorkspaces = () =>
+  api.get("/workspaces").then((r) => r.data);
+
+export const createWorkspace = (payload) =>
+  api.post("/workspaces", payload).then((r) => r.data);
+
+export const updateWorkspace = (id, payload) =>
+  api.patch(`/workspaces/${id}`, payload).then((r) => r.data);
+
+export const deleteWorkspace = (id, purge = false) =>
+  api.delete(`/workspaces/${id}?purge=${purge ? "true" : "false"}`).then((r) => r.data);
 
 export const deleteSession = (session_id) =>
   api.delete(`/sessions/${session_id}`).then((r) => r.data);

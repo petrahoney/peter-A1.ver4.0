@@ -27,6 +27,33 @@ Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi
 | SMART     | Claude Sonnet 4.5          | claude-sonnet-4-5-20250929    | anthropic  | 0.0150 |
 | CRITICAL  | Claude Opus 4.5            | claude-opus-4-5-20251101      | anthropic  | 0.1500 |
 
+## Implemented (v3.0 · 7-Jun-2026 — Project Workspaces & Memory Polish)
+
+Four cohesive additions; PETER is now a **portfolio of private councils**.
+
+### Project Workspaces (the big leap)
+- ✅ MongoDB collection `workspaces` with `id / name / description / color / created_at / updated_at`.
+- ✅ Every memory now carries `workspace_id` in its ChromaDB metadata (default `"global"`); every session and crew run carry `workspace_id` in Mongo.
+- ✅ React `WorkspaceProvider` context exposes `{ workspaces, active, activeId, setActive, refresh }`, persisting the active workspace in `localStorage`.
+- ✅ Sidebar gained a workspace selector with gold dot + counts, and a "Manage workspaces" deep-link.
+- ✅ New `/workspaces` page: create/edit/delete cards, color picker (5-tone gold palette), live memory/session/crew counts per workspace, soft purge confirmation.
+- ✅ Recall + extraction + memory listing + chat sessions + crew runs all transparently scope to the active workspace; "All workspaces" mode shows everything.
+- ✅ Workspace delete supports `?purge=true` to cascade-delete contents, otherwise items become untagged.
+- ✅ REST: `GET/POST/PATCH/DELETE /api/workspaces`.
+
+### Per-session memory toggle
+- ✅ New `memory_enabled` boolean on the session doc, plus PATCH support.
+- ✅ Chat header **MEMORY ON / MEMORY OFF** button: when off, no recall + no extraction for that session.
+- ✅ Hook reads `memory_enabled` when a session is reloaded so the toggle survives refresh.
+
+### Memory cluster node-graph
+- ✅ New `GET /api/memory/graph` endpoint returns memories clustered by type.
+- ✅ Memory page gained a **List / Graph** view toggle. Graph view renders type hubs (PREFERENCE / PROJECT / FACT / GOAL / THEME / NOTE) as styled React Flow nodes connected by gold hairlines to up-to-6 representative leaf memories per hub, arranged on a radial layout.
+
+### JSON export
+- ✅ New `GET /api/memory/export` returns portable JSON `{ exported_at, workspace_id, count, memories }`.
+- ✅ Memory page gained an **Export JSON** button that downloads `peter-memory-{workspace-slug}-{date}.json`.
+
 ## Implemented (v2.0 · 7-Jun-2026 — Strategist Memory)
 - ✅ **ChromaDB-backed long-term recall** — new `/app/backend/memory.py` running an in-process `chromadb.PersistentClient` (cosine space, all-MiniLM-L6-v2 default embeddings) at `/app/backend/chroma_data`.
 - ✅ **Automatic extraction** — every chat turn fires a fire-and-forget Claude Haiku call that mines durable preferences / projects / facts / goals / themes / notes from the exchange and persists them. Extraction failures degrade gracefully (no chat impact).

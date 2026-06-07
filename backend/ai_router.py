@@ -170,12 +170,18 @@ class AIRouter:
         return chat
 
     async def _prepare_query(
-        self, query: str, session_id: str
+        self,
+        query: str,
+        session_id: str,
+        workspace_id: Optional[str] = None,
+        memory_enabled: bool = True,
     ) -> tuple[str, list[dict[str, Any]]]:
         """Recall memories and prepend a context block to the user query."""
-        if not self.memory:
+        if not self.memory or not memory_enabled:
             return query, []
-        memories = await self.memory.recall(query, limit=5)
+        memories = await self.memory.recall(
+            query, limit=5, workspace_id=workspace_id
+        )
         if not memories:
             return query, []
         ctx = self.memory.build_context_block(memories)
@@ -187,11 +193,15 @@ class AIRouter:
         query: str,
         session_id: str,
         forced: Optional[TaskComplexity] = None,
+        workspace_id: Optional[str] = None,
+        memory_enabled: bool = True,
     ) -> dict[str, Any]:
         tier = forced or self.classify_query(query)
         meta = TIER_CATALOG[tier.value]
         chat = self._get_chat(session_id, tier)
-        composed, memories = await self._prepare_query(query, session_id)
+        composed, memories = await self._prepare_query(
+            query, session_id, workspace_id, memory_enabled
+        )
 
         start = time.perf_counter()
         # Collect streamed deltas into a single response for the non-stream endpoint.
@@ -227,11 +237,15 @@ class AIRouter:
         query: str,
         session_id: str,
         forced: Optional[TaskComplexity] = None,
+        workspace_id: Optional[str] = None,
+        memory_enabled: bool = True,
     ) -> AsyncIterator[str]:
         tier = forced or self.classify_query(query)
         meta = TIER_CATALOG[tier.value]
         chat = self._get_chat(session_id, tier)
-        composed, memories = await self._prepare_query(query, session_id)
+        composed, memories = await self._prepare_query(
+            query, session_id, workspace_id, memory_enabled
+        )
 
         # First SSE event: routing metadata + memory recall
         yield (

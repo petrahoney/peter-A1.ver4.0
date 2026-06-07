@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { BrowserRouter, Routes, Route, NavLink, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -9,6 +9,9 @@ import {
   Sparkle,
   GearSix,
   Brain,
+  Stack,
+  CaretDown,
+  Plus,
 } from "@phosphor-icons/react";
 
 import HomeView from "./views/HomeView";
@@ -18,6 +21,10 @@ import CrewView from "./views/CrewView";
 import CostView from "./views/CostView";
 import MemoryView from "./views/MemoryView";
 import SettingsView from "./views/SettingsView";
+import WorkspacesView from "./views/WorkspacesView";
+
+import { WorkspaceProvider, useWorkspace } from "./context/WorkspaceContext";
+import { Link as RLink } from "react-router-dom";
 
 import "./App.css";
 
@@ -27,9 +34,82 @@ const NAV = [
   { to: "/router", label: "Router", icon: Graph, testid: "nav-router" },
   { to: "/crew", label: "Crew Builder", icon: UsersThree, testid: "nav-crew" },
   { to: "/memory", label: "Memory", icon: Brain, testid: "nav-memory" },
+  { to: "/workspaces", label: "Workspaces", icon: Stack, testid: "nav-workspaces" },
   { to: "/cost", label: "Cost", icon: ChartLineUp, testid: "nav-cost" },
   { to: "/settings", label: "Settings", icon: GearSix, testid: "nav-settings" },
 ];
+
+function WorkspaceSelector() {
+  const { workspaces, active, setActive } = useWorkspace();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative" data-testid="workspace-selector">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-peter-navy2/60 border border-peter-gold/20 hover:border-peter-gold/50 transition-colors"
+        data-testid="workspace-selector-toggle"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className="w-1.5 h-1.5 rounded-full shrink-0"
+            style={{ backgroundColor: active ? active.color : "rgba(201,168,76,0.25)" }}
+          />
+          <span className="text-[12px] text-peter-ivory truncate font-light">
+            {active ? active.name : "All workspaces"}
+          </span>
+        </div>
+        <CaretDown size={12} weight="bold" className="text-peter-dim" />
+      </button>
+      {open ? (
+        <div
+          className="absolute z-50 left-0 right-0 mt-1 max-h-72 overflow-y-auto rounded-md glass-strong shadow-goldStrong"
+          onMouseLeave={() => setOpen(false)}
+          data-testid="workspace-selector-menu"
+        >
+          <button
+            onClick={() => {
+              setActive("");
+              setOpen(false);
+            }}
+            className={`w-full text-left px-3 py-2 text-[12px] hover:bg-peter-gold/10 transition-colors ${
+              !active ? "text-peter-gold" : "text-peter-ivory"
+            }`}
+          >
+            <span className="inline-block w-1.5 h-1.5 rounded-full mr-2 align-middle" style={{ background: "rgba(201,168,76,0.25)" }} />
+            All workspaces
+          </button>
+          {workspaces.map((w) => (
+            <button
+              key={w.id}
+              onClick={() => {
+                setActive(w.id);
+                setOpen(false);
+              }}
+              className={`w-full text-left px-3 py-2 text-[12px] hover:bg-peter-gold/10 transition-colors flex items-center gap-2 ${
+                active && active.id === w.id ? "text-peter-gold" : "text-peter-ivory"
+              }`}
+              data-testid={`workspace-option-${w.id}`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: w.color }} />
+              <span className="truncate flex-1">{w.name}</span>
+              <span className="text-[10px] text-peter-dim font-mono">
+                {w.counts.memories}m · {w.counts.sessions}s
+              </span>
+            </button>
+          ))}
+          <RLink
+            to="/workspaces"
+            onClick={() => setOpen(false)}
+            className="block px-3 py-2 text-[11px] text-peter-gold border-t border-peter-gold/15 hover:bg-peter-gold/10 transition-colors"
+          >
+            <Plus size={11} weight="bold" className="inline-block mr-1" />
+            Manage workspaces
+          </RLink>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function Sidebar() {
   return (
@@ -37,7 +117,7 @@ function Sidebar() {
       className="fixed left-0 top-0 h-screen w-64 glass-strong z-40 flex flex-col"
       data-testid="sidebar"
     >
-      <div className="px-7 pt-8 pb-5">
+      <div className="px-7 pt-8 pb-3">
         <div className="flex items-baseline gap-2">
           <span className="h-display text-3xl text-peter-ivory leading-none">
             PETER
@@ -49,10 +129,14 @@ function Sidebar() {
         <div className="mt-1 text-[10px] tracking-[0.32em] uppercase text-peter-dim font-medium">
           Intelligence, Elevated.
         </div>
-        <div className="mt-4 hairline" />
       </div>
 
-      <nav className="flex-1 px-4 mt-2 space-y-1">
+      <div className="px-4 pb-2">
+        <WorkspaceSelector />
+      </div>
+      <div className="px-7"><div className="hairline" /></div>
+
+      <nav className="flex-1 px-4 mt-2 space-y-1 overflow-y-auto">
         {NAV.map((item) => (
           <NavLink
             key={item.to}
@@ -104,19 +188,22 @@ function PageContainer({ children }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Sidebar />
-      <PageContainer>
-        <Routes>
-          <Route path="/" element={<HomeView />} />
-          <Route path="/chat" element={<ChatView />} />
-          <Route path="/router" element={<RouterView />} />
-          <Route path="/crew" element={<CrewView />} />
-          <Route path="/memory" element={<MemoryView />} />
-          <Route path="/cost" element={<CostView />} />
-          <Route path="/settings" element={<SettingsView />} />
-        </Routes>
-      </PageContainer>
-    </BrowserRouter>
+    <WorkspaceProvider>
+      <BrowserRouter>
+        <Sidebar />
+        <PageContainer>
+          <Routes>
+            <Route path="/" element={<HomeView />} />
+            <Route path="/chat" element={<ChatView />} />
+            <Route path="/router" element={<RouterView />} />
+            <Route path="/crew" element={<CrewView />} />
+            <Route path="/memory" element={<MemoryView />} />
+            <Route path="/workspaces" element={<WorkspacesView />} />
+            <Route path="/cost" element={<CostView />} />
+            <Route path="/settings" element={<SettingsView />} />
+          </Routes>
+        </PageContainer>
+      </BrowserRouter>
+    </WorkspaceProvider>
   );
 }

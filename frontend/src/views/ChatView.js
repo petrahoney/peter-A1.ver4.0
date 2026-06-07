@@ -8,6 +8,8 @@ import {
   Check,
   X,
   Stop,
+  Brain,
+  Prohibit,
 } from "@phosphor-icons/react";
 import { motion } from "framer-motion";
 import {
@@ -17,9 +19,11 @@ import {
   renameSession,
   deleteSession,
   setSessionTier,
+  setSessionMemoryEnabled,
 } from "../lib/api";
 import Markdown from "../components/Markdown";
 import useStreamingChat from "../hooks/useStreamingChat";
+import { useWorkspace } from "../context/WorkspaceContext";
 
 const TIER_COLORS = {
   free: "#C0C0C0",
@@ -307,9 +311,11 @@ function SessionItem({ s, active, onSelect, onRename, onDelete }) {
 }
 
 export default function ChatView() {
+  const { active, activeId } = useWorkspace();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sessionId, setSessionId] = useState(null);
+  const [memoryEnabled, setMemoryEnabled] = useState(true);
   const [forceTier, setForceTier] = useState(() => {
     try {
       return localStorage.getItem(LAST_TIER_KEY) || "";
@@ -343,12 +349,19 @@ export default function ChatView() {
 
   const refreshSessions = useCallback(async () => {
     try {
-      const r = await listSessions();
+      const r = await listSessions(activeId || undefined);
       setSessions(r.sessions);
     } catch {
       /* silent */
     }
-  }, []);
+  }, [activeId]);
+
+  // Reload sessions when active workspace changes. Deferred to a microtask
+  // to keep setState out of the effect's synchronous body.
+  useEffect(() => {
+    const t = setTimeout(refreshSessions, 0);
+    return () => clearTimeout(t);
+  }, [refreshSessions]);
 
   const loadSession = useCallback(async (id) => {
     stopStream();
@@ -357,6 +370,7 @@ export default function ChatView() {
     try {
       const r = await getMessages(id);
       setForceTier(r.force_tier || "");
+      setMemoryEnabled(r.memory_enabled !== false);
       setMessages(
         r.messages.map((m) => ({
           id: m.id,
@@ -381,11 +395,24 @@ export default function ChatView() {
     setMessages([]);
     queueRef.current = [];
     setQueuedCount(0);
+    setMemoryEnabled(true);
     try {
       const last = localStorage.getItem(LAST_TIER_KEY) || "";
       setForceTier(last);
     } catch {
       /* silent */
+    }
+  };
+
+  const toggleMemory = async () => {
+    const next = !memoryEnabled;
+    setMemoryEnabled(next);
+    if (sessionId) {
+      try {
+        await setSessionMemoryEnabled(sessionId, next);
+      } catch {
+        /* silent */
+      }
     }
   };
 
@@ -439,6 +466,8 @@ export default function ChatView() {
           message: text,
           session_id: sessionIdRef.current,
           force_tier: tier || null,
+          workspace_id: activeId || null,
+          memory_enabled: memoryEnabled,
         },
         {
           onRoute: (meta) => {
@@ -502,7 +531,7 @@ export default function ChatView() {
       }
       refreshSessions();
     },
-    [startStream, refreshSessions],
+    [startStream, refreshSessions, activeId, memoryEnabled],
   );
 
   // Drain the queue whenever streaming flips false.
@@ -584,16 +613,41 @@ export default function ChatView() {
             <h1 className="h-display text-4xl text-peter-ivory">
               A <em className="text-peter-gold not-italic">private</em> council
             </h1>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] tracking-[0.32em] uppercase text-peter-dim">
-                Force tier
-              </span>
-              <select
-                data-testid="force-tier-select"
-                value={forceTier}
-                onChange={(e) => onForceTierChange(e.target.value)}
-                className="bg-peter-navy2 border border-peter-gold/30 text-peter-ivory text-xs px-3 py-2 rounded-md font-mono"
+            <div className="flex items-center gap-3 flex-wrap justify-end">
+            {active ? (
+              <span
+                className="inline-flex items-center gap-1.5 px-2 py-1 rounded-sm border text-[9px] tracking-widest"
+                style={{ color: active.color, borderColor: active.color + "66" }}
+                data-testid="chat-workspace-pill"
+                title="This session is scoped to a workspace"
               >
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: active.color }} />
+                {active.name.toUpperCase()}
+              </span>
+            ) : null}
+            <button
+              onClick={toggleMemory}
+              data-testid="memory-toggle"
+              title={memoryEnabled ? "Memory ON — recall + storage active" : "Memory OFF — no recall, no storage"}
+              className={[
+                "inline-flex items-center gap-1.5 px-3 py-2 rounded-md border text-[10px] tracking-widest uppercase transition-colors",
+                memoryEnabled
+                  ? "border-peter-gold/60 text-peter-gold bg-peter-gold/10 hover:bg-peter-gold/15"
+                  : "border-peter-dim/40 text-peter-dim hover:text-peter-ivory hover:border-peter-dim/60",
+              ].join(" ")}
+            >
+              {memoryEnabled ? <Brain size={12} weight="fill" /> : <Prohibit size={12} weight="bold" />}
+              {memoryEnabled ? "Memory ON" : "Memory OFF"}
+            </button>
+            <span className="text-[10px] tracking-[0.32em] uppercase text-peter-dim">
+              Force tier
+            </span>
+            <select
+              data-testid="force-tier-select"
+              value={forceTier}
+              onChange={(e) => onForceTierChange(e.target.value)}
+              className="bg-peter-navy2 border border-peter-gold/30 text-peter-ivory text-xs px-3 py-2 rounded-md font-mono"
+            >
                 <option value="">Auto</option>
                 {Object.values(tierCatalog).map((t) => (
                   <option key={t.id} value={t.id}>

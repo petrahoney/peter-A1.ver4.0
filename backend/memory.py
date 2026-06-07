@@ -1,10 +1,14 @@
 """Strategist Memory — ChromaDB-backed long-term recall for PETER AI.
 
 Each user/assistant exchange is mined (by a cheap LLM) for durable
-facts, preferences, projects, themes and goals. Those memories are
-stored in a local ChromaDB collection and recalled by semantic search
-on every subsequent turn, then injected as a system context block so
+facts, preferences, projects, themes and goals. Memories are stored
+in a local ChromaDB collection and recalled by semantic search on
+every subsequent turn, then injected as a system context block so
 PETER's reasoning compounds across sessions.
+
+Memories carry a `workspace_id` ("global" by default) so the new
+Project Workspaces layer can scope recall and storage to a specific
+container (e.g. "Acme M&A").
 
 Designed to fail open: any extraction or recall error leaves chat
 working without memory.
@@ -17,7 +21,6 @@ import json
 import logging
 import os
 import re
-import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -35,8 +38,8 @@ log = logging.getLogger("peter.memory")
 
 CHROMA_PATH = os.environ.get("CHROMA_PATH", "/app/backend/chroma_data")
 COLLECTION = "peter_strategist_memory"
+GLOBAL_WORKSPACE = "global"
 
-# Memory taxonomy — strict allow-list so the UI can render reliably.
 MEMORY_TYPES = {"preference", "project", "fact", "goal", "theme", "note"}
 
 EXTRACTION_SYSTEM = (
@@ -57,17 +60,14 @@ def _now_iso() -> str:
 
 
 def _safe_json_array(text: str) -> list[dict]:
-    """Extract the first JSON array from an LLM reply, tolerating prose."""
     if not text:
         return []
-    # Try direct
     try:
         v = json.loads(text)
         if isinstance(v, list):
             return v
     except Exception:
         pass
-    # Find the first [...] block
     m = re.search(r"\[.*\]", text, re.DOTALL)
     if not m:
         return []
@@ -76,6 +76,10 @@ def _safe_json_array(text: str) -> list[dict]:
         return v if isinstance(v, list) else []
     except Exception:
         return []
+
+
+def _ws(workspace_id: Optional[str]) -> str:
+    return (workspace_id or GLOBAL_WORKSPACE).strip() or GLOBAL_WORKSPACE
 
 
 class StrategistMemory:
@@ -93,14 +97,17 @@ class StrategistMemory:
 
     # ───────────── recall ─────────────
 
-    async def recall(self, query: str, limit: int = 5) -> list[dict[str, Any]]:
-        """Top-k semantic recall. Returns [] on any failure."""
+    async def recall(
+        self,
+        query: str,
+        limit: int = 5,
+        workspace_id: Optional[str] = None,
+    ) -> list[dict[str, Any]]:
         try:
-            res = await asyncio.to_thread(
-                self._collection.query,
-                query_texts=[query],
-                n_results=limit,
-            )
+            kwargs = {"query_texts": [query], "n_results": limit}
+            if workspace_id:
+                kwargs["where"] = {"workspace_id": _ws(workspace_id)}
+            res = await asyncio.to_thread(self._collection.query, **kwargs)
         except Exception as e:
             log.warning("memory.recall failed: %s", e)
             return []
@@ -113,8 +120,6 @@ class StrategistMemory:
         for i, doc in enumerate(docs):
             meta = metas[i] if i < len(metas) else {}
             dist = dists[i] if i < len(dists) else None
-            # Cosine distance with all-MiniLM-L6-v2: 0 = identical, ~1 = unrelated.
-            # 0.85 is a generous cutoff to allow loose semantic matches.
             if dist is not None and dist > 0.85:
                 continue
             out.append(
@@ -123,6 +128,7 @@ class StrategistMemory:
                     "content": doc,
                     "type": meta.get("type", "note"),
                     "session_id": meta.get("session_id"),
+                    "workspace_id": meta.get("workspace_id", GLOBAL_WORKSPACE),
                     "created_at": meta.get("created_at"),
                     "distance": dist,
                 }
@@ -130,10 +136,11 @@ class StrategistMemory:
         return out
 
     def build_context_block(self, memories: list[dict[str, Any]]) -> str:
-        """Render recalled memories as a single context string for the LLM."""
         if not memories:
             return ""
-        lines = ["## What PETER remembers about you (use this naturally; do not quote verbatim):"]
+        lines = [
+            "## What PETER remembers about you (use this naturally; do not quote verbatim):"
+        ]
         for m in memories:
             lines.append(f"- [{m['type']}] {m['content']}")
         return "\n".join(lines)
@@ -141,12 +148,14 @@ class StrategistMemory:
     # ───────────── extraction & store ─────────────
 
     async def extract_and_store(
-        self, session_id: str, user_msg: str, ai_response: str
+        self,
+        session_id: str,
+        user_msg: str,
+        ai_response: str,
+        workspace_id: Optional[str] = None,
     ) -> list[dict[str, Any]]:
-        """LLM-extract durable insights and persist them. Fails silently."""
         if not user_msg or not ai_response:
             return []
-        # Skip obviously short / trivial exchanges.
         if len(user_msg) < 12 and len(ai_response) < 60:
             return []
 
@@ -193,18 +202,23 @@ class StrategistMemory:
                 {
                     "type": t,
                     "session_id": session_id or "",
+                    "workspace_id": _ws(workspace_id),
                     "created_at": _now_iso(),
                 }
             )
-            stored.append({"id": mid, "type": t, "content": content})
+            stored.append(
+                {
+                    "id": mid,
+                    "type": t,
+                    "content": content,
+                    "workspace_id": _ws(workspace_id),
+                }
+            )
 
         if ids:
             try:
                 await asyncio.to_thread(
-                    self._collection.add,
-                    ids=ids,
-                    documents=docs,
-                    metadatas=metas,
+                    self._collection.add, ids=ids, documents=docs, metadatas=metas
                 )
             except Exception as e:
                 log.warning("chroma add failed: %s", e)
@@ -213,7 +227,12 @@ class StrategistMemory:
 
     # ───────────── manual CRUD ─────────────
 
-    async def add_manual(self, content: str, mtype: str = "note") -> dict[str, Any]:
+    async def add_manual(
+        self,
+        content: str,
+        mtype: str = "note",
+        workspace_id: Optional[str] = None,
+    ) -> dict[str, Any]:
         content = (content or "").strip()
         if not content:
             raise ValueError("content required")
@@ -228,17 +247,26 @@ class StrategistMemory:
                 {
                     "type": mtype,
                     "session_id": "manual",
+                    "workspace_id": _ws(workspace_id),
                     "created_at": _now_iso(),
                 }
             ],
         )
-        return {"id": mid, "type": mtype, "content": content}
+        return {
+            "id": mid,
+            "type": mtype,
+            "content": content,
+            "workspace_id": _ws(workspace_id),
+        }
 
-    async def list_all(self, limit: int = 500) -> list[dict[str, Any]]:
+    async def list_all(
+        self, limit: int = 500, workspace_id: Optional[str] = None
+    ) -> list[dict[str, Any]]:
         try:
-            res = await asyncio.to_thread(
-                self._collection.get, include=["documents", "metadatas"]
-            )
+            kwargs = {"include": ["documents", "metadatas"]}
+            if workspace_id:
+                kwargs["where"] = {"workspace_id": _ws(workspace_id)}
+            res = await asyncio.to_thread(self._collection.get, **kwargs)
         except Exception as e:
             log.warning("memory.list_all failed: %s", e)
             return []
@@ -254,10 +282,10 @@ class StrategistMemory:
                     "content": doc,
                     "type": meta.get("type", "note"),
                     "session_id": meta.get("session_id"),
+                    "workspace_id": meta.get("workspace_id", GLOBAL_WORKSPACE),
                     "created_at": meta.get("created_at"),
                 }
             )
-        # newest first
         out.sort(key=lambda x: x.get("created_at") or "", reverse=True)
         return out[:limit]
 
@@ -267,9 +295,20 @@ class StrategistMemory:
         except Exception as e:
             log.warning("memory.delete failed: %s", e)
 
-    async def clear_all(self) -> int:
+    async def delete_many(self, memory_ids: list[str]) -> None:
+        if not memory_ids:
+            return
         try:
-            res = await asyncio.to_thread(self._collection.get)
+            await asyncio.to_thread(self._collection.delete, ids=memory_ids)
+        except Exception as e:
+            log.warning("memory.delete_many failed: %s", e)
+
+    async def clear_all(self, workspace_id: Optional[str] = None) -> int:
+        try:
+            kwargs = {}
+            if workspace_id:
+                kwargs["where"] = {"workspace_id": _ws(workspace_id)}
+            res = await asyncio.to_thread(self._collection.get, **kwargs)
             ids = res.get("ids") or []
             if ids:
                 await asyncio.to_thread(self._collection.delete, ids=ids)
@@ -278,8 +317,42 @@ class StrategistMemory:
             log.warning("memory.clear_all failed: %s", e)
             return 0
 
-    async def count(self) -> int:
+    async def count(self, workspace_id: Optional[str] = None) -> int:
         try:
-            return await asyncio.to_thread(self._collection.count)
+            if not workspace_id:
+                return await asyncio.to_thread(self._collection.count)
+            res = await asyncio.to_thread(
+                self._collection.get,
+                where={"workspace_id": _ws(workspace_id)},
+            )
+            return len(res.get("ids") or [])
         except Exception:
+            return 0
+
+    async def reassign_workspace(
+        self, memory_ids: list[str], workspace_id: str
+    ) -> int:
+        """Move memories to a different workspace (used when workspace deleted)."""
+        if not memory_ids:
+            return 0
+        try:
+            res = await asyncio.to_thread(
+                self._collection.get,
+                ids=memory_ids,
+                include=["documents", "metadatas"],
+            )
+            ids = res.get("ids") or []
+            metas = res.get("metadatas") or []
+            new_metas = []
+            for meta in metas:
+                m = dict(meta or {})
+                m["workspace_id"] = _ws(workspace_id)
+                new_metas.append(m)
+            if ids:
+                await asyncio.to_thread(
+                    self._collection.update, ids=ids, metadatas=new_metas
+                )
+            return len(ids)
+        except Exception as e:
+            log.warning("reassign_workspace failed: %s", e)
             return 0

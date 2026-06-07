@@ -68,6 +68,8 @@ class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
     force_tier: Optional[str] = None  # "free" | "cheap" | "smart" | "critical"
+    workspace_id: Optional[str] = None  # active workspace, if any
+    memory_enabled: Optional[bool] = None  # explicit override for this turn
 
 
 class ClassifyRequest(BaseModel):
@@ -76,16 +78,24 @@ class ClassifyRequest(BaseModel):
 
 class CrewBuildRequest(BaseModel):
     requirements: str
+    workspace_id: Optional[str] = None
 
 
 class FeedbackRequest(BaseModel):
     query_id: str
-    rating: int  # 1..5
+    rating: int
 
 
 class MemoryCreateRequest(BaseModel):
     content: str
     type: Optional[str] = "note"
+    workspace_id: Optional[str] = None
+
+
+class WorkspaceRequest(BaseModel):
+    name: str
+    description: Optional[str] = ""
+    color: Optional[str] = None  # any hex string
 
 
 # ───────────────────────── Health & Meta ─────────────────────────
@@ -144,14 +154,22 @@ async def chat(req: ChatRequest) -> dict[str, Any]:
                 "updated_at": now_iso(),
                 "title": req.message[:60],
                 "force_tier": (req.force_tier or "").lower() or None,
+                "workspace_id": req.workspace_id or None,
+                "memory_enabled": True if req.memory_enabled is None else bool(req.memory_enabled),
             }
         )
-    elif req.force_tier is not None:
-        # Persist any explicit tier choice on existing session too.
-        await db.sessions.update_one(
-            {"_id": session_id},
-            {"$set": {"force_tier": req.force_tier.lower() or None}},
-        )
+        memory_enabled = True if req.memory_enabled is None else bool(req.memory_enabled)
+        ws_id = req.workspace_id
+    else:
+        updates = {}
+        if req.force_tier is not None:
+            updates["force_tier"] = req.force_tier.lower() or None
+        if updates:
+            await db.sessions.update_one({"_id": session_id}, {"$set": updates})
+        memory_enabled = existing.get("memory_enabled", True)
+        if req.memory_enabled is not None:
+            memory_enabled = bool(req.memory_enabled)
+        ws_id = existing.get("workspace_id") or req.workspace_id
 
     # Save user message
     user_msg_id = str(uuid.uuid4())
@@ -165,7 +183,6 @@ async def chat(req: ChatRequest) -> dict[str, Any]:
         }
     )
 
-    # Route via the AI Router
     forced = None
     if req.force_tier:
         try:
@@ -177,9 +194,10 @@ async def chat(req: ChatRequest) -> dict[str, Any]:
         query=req.message,
         session_id=session_id,
         forced=forced,
+        workspace_id=ws_id,
+        memory_enabled=memory_enabled,
     )
 
-    # Save assistant message
     ai_msg_id = str(uuid.uuid4())
     await db.messages.insert_one(
         {
@@ -200,10 +218,12 @@ async def chat(req: ChatRequest) -> dict[str, Any]:
         {"_id": session_id}, {"$set": {"updated_at": now_iso()}}
     )
 
-    # Fire-and-forget memory extraction.
-    asyncio.create_task(
-        memory_engine.extract_and_store(session_id, req.message, result["response"])
-    )
+    if memory_enabled:
+        asyncio.create_task(
+            memory_engine.extract_and_store(
+                session_id, req.message, result["response"], workspace_id=ws_id
+            )
+        )
 
     return {
         "session_id": session_id,
@@ -215,11 +235,18 @@ async def chat(req: ChatRequest) -> dict[str, Any]:
 class SessionRenameRequest(BaseModel):
     title: Optional[str] = None
     force_tier: Optional[str] = None  # "free"|"cheap"|"smart"|"critical"|"" to clear
+    memory_enabled: Optional[bool] = None
+    workspace_id: Optional[str] = None  # "" or null to clear
 
 
 @app.get("/api/sessions")
-async def list_sessions() -> dict[str, Any]:
-    cursor = db.sessions.find({}, sort=[("updated_at", -1)]).limit(50)
+async def list_sessions(workspace_id: Optional[str] = None) -> dict[str, Any]:
+    query = {}
+    if workspace_id == "__none__":
+        query["workspace_id"] = {"$in": [None, ""]}
+    elif workspace_id:
+        query["workspace_id"] = workspace_id
+    cursor = db.sessions.find(query, sort=[("updated_at", -1)]).limit(50)
     sessions = []
     async for s in cursor:
         sessions.append(
@@ -227,6 +254,8 @@ async def list_sessions() -> dict[str, Any]:
                 "id": s["_id"],
                 "title": s.get("title", "Untitled"),
                 "force_tier": s.get("force_tier"),
+                "memory_enabled": s.get("memory_enabled", True),
+                "workspace_id": s.get("workspace_id"),
                 "created_at": s.get("created_at"),
                 "updated_at": s.get("updated_at"),
             }
@@ -252,6 +281,10 @@ async def update_session(session_id: str, req: SessionRenameRequest) -> dict[str
             except ValueError:
                 raise HTTPException(400, f"unknown tier: {req.force_tier}")
             updates["force_tier"] = ft
+    if req.memory_enabled is not None:
+        updates["memory_enabled"] = bool(req.memory_enabled)
+    if req.workspace_id is not None:
+        updates["workspace_id"] = req.workspace_id or None
     if not updates:
         raise HTTPException(400, "no updates provided")
     updates["updated_at"] = now_iso()
@@ -263,6 +296,8 @@ async def update_session(session_id: str, req: SessionRenameRequest) -> dict[str
         "id": session_id,
         "title": s.get("title"),
         "force_tier": s.get("force_tier"),
+        "memory_enabled": s.get("memory_enabled", True),
+        "workspace_id": s.get("workspace_id"),
     }
 
 
@@ -303,6 +338,8 @@ async def get_messages(session_id: str) -> dict[str, Any]:
         "session_id": session_id,
         "title": session.get("title") if session else None,
         "force_tier": session.get("force_tier") if session else None,
+        "memory_enabled": session.get("memory_enabled", True) if session else True,
+        "workspace_id": session.get("workspace_id") if session else None,
         "messages": messages,
     }
 
@@ -318,6 +355,7 @@ async def crew_build(req: CrewBuildRequest) -> dict[str, Any]:
         {
             "_id": run_id,
             "requirements": req.requirements,
+            "workspace_id": req.workspace_id or None,
             "status": "running",
             "created_at": now_iso(),
             "agents": [
@@ -328,7 +366,6 @@ async def crew_build(req: CrewBuildRequest) -> dict[str, Any]:
             "total_saved_usd": 0.0,
         }
     )
-    # Fire and forget; status is polled
     asyncio.create_task(crew_engine.run_crew(run_id, req.requirements))
     return {"run_id": run_id, "status": "running"}
 
@@ -351,8 +388,13 @@ async def crew_status(run_id: str) -> dict[str, Any]:
 
 
 @app.get("/api/crew/runs")
-async def crew_list() -> dict[str, Any]:
-    cursor = db.crew_runs.find({}, sort=[("created_at", -1)]).limit(20)
+async def crew_list(workspace_id: Optional[str] = None) -> dict[str, Any]:
+    query = {}
+    if workspace_id == "__none__":
+        query["workspace_id"] = {"$in": [None, ""]}
+    elif workspace_id:
+        query["workspace_id"] = workspace_id
+    cursor = db.crew_runs.find(query, sort=[("created_at", -1)]).limit(20)
     runs = []
     async for r in cursor:
         runs.append(
@@ -360,6 +402,7 @@ async def crew_list() -> dict[str, Any]:
                 "id": r["_id"],
                 "requirements": r["requirements"][:120],
                 "status": r["status"],
+                "workspace_id": r.get("workspace_id"),
                 "created_at": r.get("created_at"),
             }
         )
@@ -442,23 +485,75 @@ async def stats() -> dict[str, Any]:
 
 
 @app.get("/api/memory")
-async def memory_list() -> dict[str, Any]:
-    items = await memory_engine.list_all(limit=500)
-    return {"count": len(items), "types": sorted(MEMORY_TYPES), "memories": items}
+async def memory_list(workspace_id: Optional[str] = None) -> dict[str, Any]:
+    items = await memory_engine.list_all(limit=500, workspace_id=workspace_id)
+    return {
+        "count": len(items),
+        "types": sorted(MEMORY_TYPES),
+        "workspace_id": workspace_id,
+        "memories": items,
+    }
 
 
 @app.get("/api/memory/recall")
-async def memory_recall(q: str, limit: int = 5) -> dict[str, Any]:
+async def memory_recall(
+    q: str, limit: int = 5, workspace_id: Optional[str] = None
+) -> dict[str, Any]:
     if not q:
         raise HTTPException(400, "query 'q' required")
-    items = await memory_engine.recall(q, limit=limit)
-    return {"query": q, "memories": items}
+    items = await memory_engine.recall(q, limit=limit, workspace_id=workspace_id)
+    return {"query": q, "workspace_id": workspace_id, "memories": items}
+
+
+@app.get("/api/memory/export")
+async def memory_export(workspace_id: Optional[str] = None) -> dict[str, Any]:
+    """Portable JSON snapshot of every memory (optionally filtered)."""
+    items = await memory_engine.list_all(limit=10000, workspace_id=workspace_id)
+    return {
+        "exported_at": now_iso(),
+        "workspace_id": workspace_id,
+        "count": len(items),
+        "memories": items,
+    }
+
+
+@app.get("/api/memory/graph")
+async def memory_graph(workspace_id: Optional[str] = None) -> dict[str, Any]:
+    """Cluster memories by type into a node-graph structure for the UI."""
+    items = await memory_engine.list_all(limit=1000, workspace_id=workspace_id)
+    by_type: dict[str, list[dict[str, Any]]] = {}
+    for m in items:
+        by_type.setdefault(m["type"], []).append(m)
+    clusters = []
+    for t in sorted(by_type.keys()):
+        clusters.append(
+            {
+                "type": t,
+                "count": len(by_type[t]),
+                "memories": [
+                    {
+                        "id": m["id"],
+                        "content": m["content"],
+                        "created_at": m.get("created_at"),
+                        "session_id": m.get("session_id"),
+                    }
+                    for m in by_type[t]
+                ],
+            }
+        )
+    return {
+        "workspace_id": workspace_id,
+        "total": len(items),
+        "clusters": clusters,
+    }
 
 
 @app.post("/api/memory")
 async def memory_create(req: MemoryCreateRequest) -> dict[str, Any]:
     try:
-        item = await memory_engine.add_manual(req.content, req.type or "note")
+        item = await memory_engine.add_manual(
+            req.content, req.type or "note", workspace_id=req.workspace_id
+        )
     except ValueError as e:
         raise HTTPException(400, str(e))
     return item
@@ -471,9 +566,110 @@ async def memory_delete(memory_id: str) -> dict[str, Any]:
 
 
 @app.delete("/api/memory")
-async def memory_clear() -> dict[str, Any]:
-    n = await memory_engine.clear_all()
-    return {"cleared": n}
+async def memory_clear(workspace_id: Optional[str] = None) -> dict[str, Any]:
+    n = await memory_engine.clear_all(workspace_id=workspace_id)
+    return {"cleared": n, "workspace_id": workspace_id}
+
+
+# ───────────────────────── Project Workspaces ─────────────────────────
+
+
+DEFAULT_WS_COLORS = ["#C9A84C", "#E8D5A3", "#8B6914", "#C0C0C0", "#F5F5F0"]
+
+
+@app.get("/api/workspaces")
+async def workspaces_list() -> dict[str, Any]:
+    cursor = db.workspaces.find({}, sort=[("created_at", 1)])
+    out = []
+    async for w in cursor:
+        wid = w["_id"]
+        sess_count = await db.sessions.count_documents({"workspace_id": wid})
+        crew_count = await db.crew_runs.count_documents({"workspace_id": wid})
+        mem_count = await memory_engine.count(workspace_id=wid)
+        out.append(
+            {
+                "id": wid,
+                "name": w.get("name"),
+                "description": w.get("description") or "",
+                "color": w.get("color") or DEFAULT_WS_COLORS[0],
+                "created_at": w.get("created_at"),
+                "updated_at": w.get("updated_at"),
+                "counts": {
+                    "memories": mem_count,
+                    "sessions": sess_count,
+                    "crew_runs": crew_count,
+                },
+            }
+        )
+    return {"workspaces": out}
+
+
+@app.post("/api/workspaces")
+async def workspaces_create(req: WorkspaceRequest) -> dict[str, Any]:
+    name = (req.name or "").strip()
+    if not name:
+        raise HTTPException(400, "name required")
+    wid = str(uuid.uuid4())
+    existing = await db.workspaces.count_documents({})
+    color = req.color or DEFAULT_WS_COLORS[existing % len(DEFAULT_WS_COLORS)]
+    doc = {
+        "_id": wid,
+        "name": name[:80],
+        "description": (req.description or "")[:280],
+        "color": color,
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+    }
+    await db.workspaces.insert_one(doc)
+    return {**doc, "id": wid, "counts": {"memories": 0, "sessions": 0, "crew_runs": 0}}
+
+
+@app.patch("/api/workspaces/{workspace_id}")
+async def workspaces_update(workspace_id: str, req: WorkspaceRequest) -> dict[str, Any]:
+    updates: dict[str, Any] = {}
+    if req.name is not None:
+        n = req.name.strip()[:80]
+        if not n:
+            raise HTTPException(400, "name cannot be empty")
+        updates["name"] = n
+    if req.description is not None:
+        updates["description"] = req.description.strip()[:280]
+    if req.color is not None:
+        updates["color"] = req.color
+    if not updates:
+        raise HTTPException(400, "nothing to update")
+    updates["updated_at"] = now_iso()
+    result = await db.workspaces.update_one({"_id": workspace_id}, {"$set": updates})
+    if result.matched_count == 0:
+        raise HTTPException(404, "workspace not found")
+    w = await db.workspaces.find_one({"_id": workspace_id})
+    return {"id": workspace_id, **{k: w.get(k) for k in ("name", "description", "color")}}
+
+
+@app.delete("/api/workspaces/{workspace_id}")
+async def workspaces_delete(workspace_id: str, purge: bool = False) -> dict[str, Any]:
+    """Delete a workspace. If purge=true, also drop memories + sessions + crew runs.
+    Otherwise items keep their workspace_id but the container is gone."""
+    w = await db.workspaces.find_one({"_id": workspace_id})
+    if not w:
+        raise HTTPException(404, "workspace not found")
+
+    if purge:
+        # Delete all memories in this workspace
+        await memory_engine.clear_all(workspace_id=workspace_id)
+        # Delete sessions + their messages
+        sess_cursor = db.sessions.find({"workspace_id": workspace_id})
+        sess_ids = []
+        async for s in sess_cursor:
+            sess_ids.append(s["_id"])
+        if sess_ids:
+            await db.messages.delete_many({"session_id": {"$in": sess_ids}})
+            await db.sessions.delete_many({"_id": {"$in": sess_ids}})
+        # Delete crew runs
+        await db.crew_runs.delete_many({"workspace_id": workspace_id})
+
+    await db.workspaces.delete_one({"_id": workspace_id})
+    return {"id": workspace_id, "deleted": True, "purged": purge}
 
 
 # ───────────────────────── Streaming chat (SSE) ─────────────────────────
@@ -493,13 +689,22 @@ async def chat_stream(req: ChatRequest):
                 "updated_at": now_iso(),
                 "title": req.message[:60],
                 "force_tier": (req.force_tier or "").lower() or None,
+                "workspace_id": req.workspace_id or None,
+                "memory_enabled": True if req.memory_enabled is None else bool(req.memory_enabled),
             }
         )
-    elif req.force_tier is not None:
-        await db.sessions.update_one(
-            {"_id": session_id},
-            {"$set": {"force_tier": req.force_tier.lower() or None}},
-        )
+        memory_enabled = True if req.memory_enabled is None else bool(req.memory_enabled)
+        ws_id = req.workspace_id
+    else:
+        updates = {}
+        if req.force_tier is not None:
+            updates["force_tier"] = req.force_tier.lower() or None
+        if updates:
+            await db.sessions.update_one({"_id": session_id}, {"$set": updates})
+        memory_enabled = existing.get("memory_enabled", True)
+        if req.memory_enabled is not None:
+            memory_enabled = bool(req.memory_enabled)
+        ws_id = existing.get("workspace_id") or req.workspace_id
 
     await db.messages.insert_one(
         {
@@ -515,7 +720,11 @@ async def chat_stream(req: ChatRequest):
 
     async def event_generator() -> AsyncIterator[str]:
         async for chunk in router_engine.route_and_stream(
-            req.message, session_id, forced=forced
+            req.message,
+            session_id,
+            forced=forced,
+            workspace_id=ws_id,
+            memory_enabled=memory_enabled,
         ):
             yield chunk
 
