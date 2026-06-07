@@ -27,7 +27,35 @@ Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi
 | SMART     | Claude Sonnet 4.5          | claude-sonnet-4-5-20250929    | anthropic  | 0.0150 |
 | CRITICAL  | Claude Opus 4.5            | claude-opus-4-5-20251101      | anthropic  | 0.1500 |
 
-## Implemented (v3.1 · 7-Jun-2026 — Brand Sweep + Integration Verification)
+## Implemented (v4.0 · 8-Jun-2026 — Message #347 closeout)
+
+Five prompts in user message #347 audited and closed.
+
+### Sidebar right-click context menu (Prompt 3)
+- ✅ `SessionItem` now exposes `onContextMenu` opening a fixed-position menu with **Rename** and **Delete** items + dividers.
+- ✅ Menu clamps to viewport edges; closes on Escape, click outside, or scroll.
+- ✅ Rename routes to inline editing (`session-rename-input-{id}`); Delete fires `window.confirm` and the existing DELETE flow.
+- ✅ Hover-action icons retained as redundant affordance.
+
+### Footer one-liner (Prompt 4)
+- ✅ Sidebar footer now reads exactly: **"PETER AI v4.0 — Intelligence, Elevated. Built in Indonesia."** with the centre clause in Champagne Gold (`[data-testid="sidebar-footer-brand"]`).
+- ✅ DOM scan across all 8 routes: 0 occurrences of the word "Emergent".
+
+### Markdown strict styling (Prompt 2)
+- ✅ H1 → Cormorant Garamond serif at `#C9A84C` (Champagne Gold).
+- ✅ Code blocks (inline + fenced) → solid `#0A0A0A` background with gold-tinted hairline border.
+- ✅ Tables → wrapped in `.md-table` with zebra rows (`rgba(10,15,30,0.35)` / `rgba(201,168,76,0.04)`) + gold hover; thead headers in champagne gold.
+
+### Workspace-aware Cost Dashboard (P1 add-on)
+- ✅ `GET /api/stats` now accepts `?workspace_id=<id>` (also `__none__` for untagged). Messages are scoped via the parent session join. Response echoes `workspace_id`.
+- ✅ Frontend `stats(workspace_id)` signature; `CostView` consumes `useWorkspace()` and re-fetches on workspace change.
+- ✅ New `[data-testid="cost-workspace-scope"]` badge in the header reading "Scope: All workspaces" / "Scope: {workspace name}".
+
+### Testing
+- ✅ 14/14 backend pytest in `/app/backend/tests/test_iteration2.py`.
+- ✅ Frontend UI verification 100% across footer text, Emergent-scan, context menu UX, Cost scope switch, Markdown styling.
+
+
 - ✅ **Branding sweep** — DOM scan across every page (`/`, `/chat`, `/router`, `/crew`, `/memory`, `/workspaces`, `/cost`, `/settings`) reports **zero "emergent" matches**.
 - ✅ Sidebar footer now reads: "v4.0 · The Luxury Strategist / Intelligence, Elevated. / Built in Indonesia · For the few."
 - ✅ Settings page gained an **About PETER** card: "Personal Enhanced Thinking & Execution Robot" with the full PETER AI manifesto.
@@ -135,7 +163,15 @@ Four cohesive additions; PETER is now a **portfolio of private councils**.
 - Auth (JWT or Emergent Google Auth).
 - Token-accurate billing via provider usage payloads instead of estimate.
 - Export crew artifact bundle as a ZIP / GitHub PR.
+- Denormalise `workspace_id` onto messages for $lookup-free cost queries at scale.
+- WorkspaceSelector: close menu on outside click.
+- React Router v7 future flags to silence migration warnings.
+
+## Implemented (v3.1 · 7-Jun-2026 — Brand Sweep + Integration Verification)
+- ✅ Branding sweep — DOM scan across every page reports zero "emergent" matches.
+- ✅ Sidebar footer + Settings About PETER card established.
+- ✅ HTML `<meta description>` + OG tags + FastAPI app title updated.
 
 ## Next Action Items
-- Validate all flows via testing subagent.
-- If green, deliver to user; gather feedback on streaming / markdown polish.
+- Iteration 2 closed (Message #347 checklist). Ready for user verification on /chat (right-click), /cost (workspace scope) and refreshed Markdown rendering.
+- Potential next: P2 backlog items above, or new feature directions from user.
