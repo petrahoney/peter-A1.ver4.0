@@ -1,7 +1,7 @@
 """AI Router — cost-optimised multi-model selection for PETER AI v4.0.
 
 Classifies a query into one of four tiers and routes it to the cheapest
-capable model, all through the Emergent Universal Key.
+capable model, all through the managed Universal Key.
 """
 
 from __future__ import annotations

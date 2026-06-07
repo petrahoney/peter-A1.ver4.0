@@ -1,7 +1,7 @@
 """PETER Crew Manager — 7-agent app-builder orchestration.
 
 Lightweight CrewAI-style sequential workflow built directly on the
-Emergent Universal Key (no extra dependency). Each agent uses the
+Universal Key (no extra dependency). Each agent uses the
 right tier from the AI Router so cost stays low while keeping the
 "Architect" and "QA" steps on Claude Sonnet for quality.
 """

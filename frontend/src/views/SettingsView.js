@@ -15,7 +15,28 @@ export default function SettingsView() {
       <h1 className="h-display text-4xl text-peter-ivory mt-1">
         The <em className="text-peter-gold not-italic">configuration</em>
       </h1>
-      <p className="text-peter-ivory/70 mt-3 max-w-3xl text-sm font-light leading-relaxed">
+
+      {/* About */}
+      <div className="mt-8 p-6 bg-peter-navy/40 border border-peter-gold/15 rounded-lg">
+        <div className="text-[10px] tracking-[0.3em] uppercase text-peter-dim mb-2">
+          About PETER
+        </div>
+        <div className="h-display text-2xl text-peter-ivory">
+          Personal Enhanced Thinking &amp; Execution Robot
+        </div>
+        <p
+          className="mt-3 text-sm font-light leading-relaxed max-w-3xl"
+          style={{ color: "#E5E5E5" }}
+          data-testid="about-paragraph"
+        >
+          PETER AI v4.0 is a luxury strategist&rsquo;s command center: intelligent
+          multi-model routing, a seven-agent build crew, long-form ChromaDB-backed
+          memory and project workspaces. Built in Indonesia, for the few who
+          prefer signal to noise. <span className="text-peter-gold">Intelligence, Elevated.</span>
+        </p>
+      </div>
+
+      <p className="text-peter-ivory/70 mt-8 max-w-3xl text-sm font-light leading-relaxed">
         Live in the preview, PETER routes via a managed universal key — Claude Sonnet
         4.5, Haiku 4.5, Opus 4.5 and Gemini 3 Flash. For self-hosting, run the included
         <span className="text-peter-gold"> docker-compose</span> stack to wire in
@@ -42,7 +63,10 @@ export default function SettingsView() {
             <div className="text-xs font-mono text-peter-dim">
               model · {tier.preview_model}
             </div>
-            <div className="text-xs text-peter-ivory/80 mt-3 font-light leading-relaxed">
+            <div
+              className="text-xs mt-3 font-light leading-relaxed"
+              style={{ color: "#E5E5E5" }}
+            >
               {tier.purpose}
             </div>
           </div>
@@ -54,7 +78,7 @@ export default function SettingsView() {
           Local self-host
         </div>
         <div className="h-display text-2xl text-peter-ivory">One-command deploy</div>
-        <pre className="mt-3 text-xs font-mono bg-peter-black/60 border border-peter-gold/10 rounded-md p-4 text-peter-ivory/90 overflow-x-auto">
+        <pre className="mt-3 text-xs font-mono bg-peter-black/60 border border-peter-gold/10 rounded-md p-4 overflow-x-auto" style={{ color: "#E5E5E5" }}>
 {`# Inside /app/deploy
 cp .env.example .env  # fill in keys
 docker compose up -d
@@ -62,6 +86,10 @@ docker compose up -d
 # Backend   → http://localhost:8001
 # Ollama    → http://localhost:11434`}
         </pre>
+      </div>
+
+      <div className="mt-8 text-center text-[10px] tracking-[0.32em] uppercase text-peter-dim/60">
+        PETER AI v4.0 — Intelligence, Elevated. Built in Indonesia.
       </div>
     </div>
   );

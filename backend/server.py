@@ -46,7 +46,11 @@ memory_engine = StrategistMemory(api_key=EMERGENT_LLM_KEY)
 router_engine = AIRouter(api_key=EMERGENT_LLM_KEY, db=db, memory=memory_engine)
 crew_engine = PeterCrewManager(api_key=EMERGENT_LLM_KEY, db=db, router=router_engine)
 
-app = FastAPI(title="PETER AI v4.0", version="4.0.0")
+app = FastAPI(
+    title="PETER AI v4.0",
+    version="4.0.0",
+    description="PETER AI (Personal Enhanced Thinking & Execution Robot) — The Luxury Strategist's Command Center.",
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -621,7 +625,15 @@ async def workspaces_create(req: WorkspaceRequest) -> dict[str, Any]:
         "updated_at": now_iso(),
     }
     await db.workspaces.insert_one(doc)
-    return {**doc, "id": wid, "counts": {"memories": 0, "sessions": 0, "crew_runs": 0}}
+    return {
+        "id": wid,
+        "name": doc["name"],
+        "description": doc["description"],
+        "color": doc["color"],
+        "created_at": doc["created_at"],
+        "updated_at": doc["updated_at"],
+        "counts": {"memories": 0, "sessions": 0, "crew_runs": 0},
+    }
 
 
 @app.patch("/api/workspaces/{workspace_id}")

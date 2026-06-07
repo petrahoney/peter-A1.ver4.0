@@ -164,7 +164,10 @@ function Sidebar() {
           v4.0 · The Luxury Strategist
         </div>
         <div className="mt-1 text-xs text-peter-dim/70 font-light">
-          Sovereign intelligence platform
+          Intelligence, Elevated.
+        </div>
+        <div className="mt-1 text-[10px] text-peter-dim/60 font-light">
+          Built in Indonesia · For the few.
         </div>
       </div>
     </aside>

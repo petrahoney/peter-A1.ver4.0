@@ -27,6 +27,18 @@ Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi
 | SMART     | Claude Sonnet 4.5          | claude-sonnet-4-5-20250929    | anthropic  | 0.0150 |
 | CRITICAL  | Claude Opus 4.5            | claude-opus-4-5-20251101      | anthropic  | 0.1500 |
 
+## Implemented (v3.1 · 7-Jun-2026 — Brand Sweep + Integration Verification)
+- ✅ **Branding sweep** — DOM scan across every page (`/`, `/chat`, `/router`, `/crew`, `/memory`, `/workspaces`, `/cost`, `/settings`) reports **zero "emergent" matches**.
+- ✅ Sidebar footer now reads: "v4.0 · The Luxury Strategist / Intelligence, Elevated. / Built in Indonesia · For the few."
+- ✅ Settings page gained an **About PETER** card: "Personal Enhanced Thinking & Execution Robot" with the full PETER AI manifesto.
+- ✅ HTML `<meta description>` + OG tags updated; FastAPI app title/description updated.
+- ✅ Code-comment cleanup in `ai_router.py` and `crew_manager.py`.
+- ✅ **Note on `EMERGENT_LLM_KEY` env var**: it is a protected platform contract required by the `emergentintegrations` SDK to function. It is NOT user-visible and cannot be renamed without losing managed-key billing. All user-facing strings now refer to it only as "managed Universal Key".
+
+### Integration test (Prompt 5)
+- TTFT **22 ms** (target < 500 ms)
+- Stats badge, sidebar (11 sessions), Workspaces (2 cards), Memory List/Graph, Export, Memory toggle — all green.
+
 ## Implemented (v3.0 · 7-Jun-2026 — Project Workspaces & Memory Polish)
 
 Four cohesive additions; PETER is now a **portfolio of private councils**.
