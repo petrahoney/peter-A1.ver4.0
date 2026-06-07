@@ -38,6 +38,9 @@ export const crewList = () =>
 export const renameSession = (session_id, title) =>
   api.patch(`/sessions/${session_id}`, { title }).then((r) => r.data);
 
+export const setSessionTier = (session_id, force_tier) =>
+  api.patch(`/sessions/${session_id}`, { force_tier: force_tier || "" }).then((r) => r.data);
+
 export const deleteSession = (session_id) =>
   api.delete(`/sessions/${session_id}`).then((r) => r.data);
 

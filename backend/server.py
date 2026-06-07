@@ -136,7 +136,14 @@ async def chat(req: ChatRequest) -> dict[str, Any]:
                 "created_at": now_iso(),
                 "updated_at": now_iso(),
                 "title": req.message[:60],
+                "force_tier": (req.force_tier or "").lower() or None,
             }
+        )
+    elif req.force_tier is not None:
+        # Persist any explicit tier choice on existing session too.
+        await db.sessions.update_one(
+            {"_id": session_id},
+            {"$set": {"force_tier": req.force_tier.lower() or None}},
         )
 
     # Save user message
@@ -194,7 +201,8 @@ async def chat(req: ChatRequest) -> dict[str, Any]:
 
 
 class SessionRenameRequest(BaseModel):
-    title: str
+    title: Optional[str] = None
+    force_tier: Optional[str] = None  # "free"|"cheap"|"smart"|"critical"|"" to clear
 
 
 @app.get("/api/sessions")
@@ -206,6 +214,7 @@ async def list_sessions() -> dict[str, Any]:
             {
                 "id": s["_id"],
                 "title": s.get("title", "Untitled"),
+                "force_tier": s.get("force_tier"),
                 "created_at": s.get("created_at"),
                 "updated_at": s.get("updated_at"),
             }
@@ -214,16 +223,35 @@ async def list_sessions() -> dict[str, Any]:
 
 
 @app.patch("/api/sessions/{session_id}")
-async def rename_session(session_id: str, req: SessionRenameRequest) -> dict[str, Any]:
-    title = (req.title or "").strip()[:120]
-    if not title:
-        raise HTTPException(400, "title required")
-    result = await db.sessions.update_one(
-        {"_id": session_id}, {"$set": {"title": title, "updated_at": now_iso()}}
-    )
+async def update_session(session_id: str, req: SessionRenameRequest) -> dict[str, Any]:
+    updates: dict[str, Any] = {}
+    if req.title is not None:
+        title = req.title.strip()[:120]
+        if not title:
+            raise HTTPException(400, "title cannot be empty")
+        updates["title"] = title
+    if req.force_tier is not None:
+        ft = req.force_tier.strip().lower()
+        if ft == "":
+            updates["force_tier"] = None
+        else:
+            try:
+                TaskComplexity(ft)
+            except ValueError:
+                raise HTTPException(400, f"unknown tier: {req.force_tier}")
+            updates["force_tier"] = ft
+    if not updates:
+        raise HTTPException(400, "no updates provided")
+    updates["updated_at"] = now_iso()
+    result = await db.sessions.update_one({"_id": session_id}, {"$set": updates})
     if result.matched_count == 0:
         raise HTTPException(404, "session not found")
-    return {"id": session_id, "title": title}
+    s = await db.sessions.find_one({"_id": session_id})
+    return {
+        "id": session_id,
+        "title": s.get("title"),
+        "force_tier": s.get("force_tier"),
+    }
 
 
 @app.delete("/api/sessions/{session_id}")
@@ -242,6 +270,7 @@ async def delete_session(session_id: str) -> dict[str, Any]:
 
 @app.get("/api/sessions/{session_id}/messages")
 async def get_messages(session_id: str) -> dict[str, Any]:
+    session = await db.sessions.find_one({"_id": session_id})
     cursor = db.messages.find({"session_id": session_id}, sort=[("created_at", 1)])
     messages = []
     async for m in cursor:
@@ -258,7 +287,12 @@ async def get_messages(session_id: str) -> dict[str, Any]:
                 "created_at": m.get("created_at"),
             }
         )
-    return {"session_id": session_id, "messages": messages}
+    return {
+        "session_id": session_id,
+        "title": session.get("title") if session else None,
+        "force_tier": session.get("force_tier") if session else None,
+        "messages": messages,
+    }
 
 
 # ───────────────────────── Crew (multi-agent) ─────────────────────────
@@ -408,7 +442,13 @@ async def chat_stream(req: ChatRequest):
                 "created_at": now_iso(),
                 "updated_at": now_iso(),
                 "title": req.message[:60],
+                "force_tier": (req.force_tier or "").lower() or None,
             }
+        )
+    elif req.force_tier is not None:
+        await db.sessions.update_one(
+            {"_id": session_id},
+            {"$set": {"force_tier": req.force_tier.lower() or None}},
         )
 
     await db.messages.insert_one(

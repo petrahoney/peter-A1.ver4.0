@@ -27,6 +27,10 @@ Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi
 | SMART     | Claude Sonnet 4.5          | claude-sonnet-4-5-20250929    | anthropic  | 0.0150 |
 | CRITICAL  | Claude Opus 4.5            | claude-opus-4-5-20251101      | anthropic  | 0.1500 |
 
+## Implemented (v1.2 · 7-Jun-2026)
+- ✅ **Stop streaming** — Send button morphs into a gold-outlined Stop button while in-flight; clicks abort the fetch via the existing `AbortController`. Partial content is preserved on the bubble; UI returns to Send instantly.
+- ✅ **Per-session `force_tier` persistence** — stored on each session document in MongoDB. Restored when a session is reloaded (page refresh or sidebar select). The dropdown PATCHes `/api/sessions/{id}` immediately when changed inside a session, and `/api/chat` + `/api/chat/stream` persist the initial tier when the session is first created.
+
 ## Implemented (v1.1 · 7-Jun-2026)
 - ✅ **Token-by-token SSE streaming** in chat (`/api/chat/stream` consumed via fetch+ReadableStream; live tier badge appears at first `route` event, deltas append, `done` finalises stats).
 - ✅ **Markdown rendering** for chat assistant replies and crew agent output (`react-markdown` + `remark-gfm`, fully styled with luxury theme — headings, code blocks, tables, blockquotes, lists).
@@ -63,7 +67,8 @@ Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi
 - ~~Streaming chat UI (token-by-token)~~ — done in v1.1.
 - ~~Markdown rendering in agent output and chat~~ — done in v1.1.
 - ~~Session sidebar with switch / rename / delete in Chat view~~ — done in v1.1.
-- "Stop streaming" button to abort mid-flight.
+- ~~"Stop streaming" button to abort mid-flight~~ — done in v1.2.
+- ~~Persist `force_tier` per session~~ — done in v1.2.
 
 ## Backlog (P2)
 - Real Ollama integration for FREE tier in preview (would require Ollama deploy).

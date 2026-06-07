@@ -9,6 +9,7 @@ import {
   Trash,
   Check,
   X,
+  Stop,
 } from "@phosphor-icons/react";
 import { motion } from "framer-motion";
 import {
@@ -17,6 +18,7 @@ import {
   listSessions,
   renameSession,
   deleteSession,
+  setSessionTier,
 } from "../lib/api";
 import { streamChat } from "../lib/stream";
 import Markdown from "../components/Markdown";
@@ -237,6 +239,7 @@ export default function ChatView() {
     setMessages([]);
     try {
       const r = await getMessages(id);
+      setForceTier(r.force_tier || "");
       setMessages(
         r.messages.map((m) => ({
           id: m.id,
@@ -258,6 +261,24 @@ export default function ChatView() {
     if (abortRef.current) abortRef.current.abort();
     setSessionId(null);
     setMessages([]);
+    setForceTier("");
+  };
+
+  const onForceTierChange = async (value) => {
+    setForceTier(value);
+    // If we're already inside a session, persist the preference.
+    if (sessionId) {
+      try {
+        await setSessionTier(sessionId, value);
+        refreshSessions();
+      } catch {
+        /* silent */
+      }
+    }
+  };
+
+  const stopStreaming = () => {
+    if (abortRef.current) abortRef.current.abort();
   };
 
   const handleRename = async (id, title) => {
@@ -408,7 +429,7 @@ export default function ChatView() {
               <select
                 data-testid="force-tier-select"
                 value={forceTier}
-                onChange={(e) => setForceTier(e.target.value)}
+                onChange={(e) => onForceTierChange(e.target.value)}
                 className="bg-peter-navy2 border border-peter-gold/30 text-peter-ivory text-xs px-3 py-2 rounded-md font-mono"
               >
                 <option value="">Auto</option>
@@ -481,13 +502,25 @@ export default function ChatView() {
               className="flex-1 bg-peter-navy2 border border-peter-gold/20 focus:border-peter-gold/60 focus:outline-none text-peter-ivory px-4 py-3 rounded-md resize-none font-light placeholder:text-peter-dim/60 transition-colors"
             />
             <button
-              onClick={send}
-              disabled={!input.trim() || streaming}
-              data-testid="chat-send"
-              className="bg-peter-gold disabled:opacity-40 text-peter-black hover:bg-peter-goldLight transition-colors px-5 py-3 rounded-md font-medium inline-flex items-center gap-2"
+              onClick={streaming ? stopStreaming : send}
+              disabled={!streaming && !input.trim()}
+              data-testid={streaming ? "chat-stop" : "chat-send"}
+              className={[
+                "transition-colors px-5 py-3 rounded-md font-medium inline-flex items-center gap-2",
+                streaming
+                  ? "bg-peter-navy2 text-peter-gold border border-peter-gold/60 hover:bg-peter-gold/10"
+                  : "bg-peter-gold disabled:opacity-40 text-peter-black hover:bg-peter-goldLight",
+              ].join(" ")}
             >
-              <PaperPlaneRight size={16} weight="fill" />
-              {streaming ? "Streaming…" : "Send"}
+              {streaming ? (
+                <>
+                  <Stop size={16} weight="fill" /> Stop
+                </>
+              ) : (
+                <>
+                  <PaperPlaneRight size={16} weight="fill" /> Send
+                </>
+              )}
             </button>
           </div>
         </div>
