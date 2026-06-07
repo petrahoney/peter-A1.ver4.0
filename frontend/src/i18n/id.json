@@ -187,7 +187,7 @@
     "savedPrompts": "Genius prompt tersimpan",
     "noSavedPrompts": "Belum ada genius prompt. Jalankan loop di atas untuk membuat.",
     "applyPrompt": "Pakai",
-    "timingHint": "1 iterasi ≈ 30 detik · 2 iter ≈ 60 detik · batas proxy ≈ 100 detik",
+    "timingHint": "1 iterasi ≈ 30 detik · 3 iter ≈ 90 detik · streaming bypass proxy",
     "openInCrew": "Buka di Crew",
     "score8Plus": "(skor 8+)",
     "crewHintBelow8": "Skor 8+ membuka handoff kelas produksi. Di bawah 8 tetap bisa — Crew tetap akan membuat production checklist.",

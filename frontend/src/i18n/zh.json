@@ -187,7 +187,7 @@
     "savedPrompts": "已保存的天才提示词",
     "noSavedPrompts": "暂无已保存的天才提示词。运行上面的循环来创建一个。",
     "applyPrompt": "应用",
-    "timingHint": "1 次迭代 ≈ 30 秒 · 2 次 ≈ 60 秒 · 代理上限 ≈ 100 秒",
+    "timingHint": "1 次迭代 ≈ 30 秒 · 3 次 ≈ 90 秒 · 流式绕过代理上限",
     "openInCrew": "在团队中打开",
     "score8Plus": "(8 分以上)",
     "crewHintBelow8": "8 分以上解锁生产级交接。低于 8 分也可以使用 — 团队仍会生成生产清单。",

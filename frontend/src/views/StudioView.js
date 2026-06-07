@@ -719,6 +719,7 @@ export default function StudioView() {
                       <div className="text-xs text-peter-ivory truncate">{p.topic}</div>
                       <div className="text-[10px] font-mono text-peter-dim">
                         {p.platform} · {p.style}
+                        {p.language ? ` · ${p.language}` : ""}
                       </div>
                     </div>
                     <div className="text-[10px] tnum text-peter-gold font-mono ml-2">

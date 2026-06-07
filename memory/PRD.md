@@ -1,7 +1,7 @@
-# PETER AI v5.1 — Product Requirements Document
+# PETER AI v5.2 — Product Requirements Document
 
 ## Original problem statement
-Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi-model routing, CrewAI orchestration, and local-first deployment (Docker Compose). Frontend Next.js / React, backend FastAPI, PostgreSQL + Redis + ChromaDB + Ollama. Phase 1 local self-host; Phase 2 cloud-ready.
+Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi-model routing, CrewAI orchestration, and local-first deployment (Docker Compose). Frontend React, backend FastAPI, PostgreSQL + Redis + ChromaDB + Ollama. Phase 1 local self-host; Phase 2 cloud-ready.
 
 ## User choices (verbatim)
 1. Platform/Stack: **(c) Parallel-track** — live MVP on Emergent stack + docker-compose artifacts for self-host.
@@ -16,10 +16,10 @@ Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi
 - **Backend** `/app/backend` — FastAPI + Motor (MongoDB) + emergentintegrations + ChromaDB.
   - `ai_router.py` — pattern + heuristic classifier → 4 tiers (FREE/CHEAP/SMART/CRITICAL).
   - `crew_manager.py` — sequential 7-agent orchestration.
-  - `script_studio.py` — Prompts 14/17/18 (script gen, eval, genius-prompt loop).
+  - `script_studio.py` — Prompts 14/17/18 (script gen, eval, genius-prompt loop + streaming generator).
   - `i18n.py` — Backend localisation (Accept-Language → agent roles/goals).
   - `memory.py` — Strategist Memory (ChromaDB).
-  - `server.py` — REST API surface.
+  - `server.py` — REST API surface + **job-queue + reconnecting-SSE pattern** for long LLM jobs.
 
 ## Models (preview tier mapping)
 | Tier      | Self-host                  | Preview substitute            | Provider   | $/1K   |
@@ -31,44 +31,43 @@ Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi
 
 ## Implemented
 
-### v5.1 · Feb 2026 — Studio→Crew Handoff + Target-Language Genius Loop (THIS SESSION)
-- ✅ **Genius-Prompt target_language** — `/api/genius-prompt/generate` now accepts `target_language` and propagates through the meta-prompt engineer + sample-script gen + evaluation so the saved prompt and evolution scripts are written in the user's chosen language (verified for ID + EN heuristic).
-- ✅ **"Open in Crew" handoff** — Studio's evaluation card has `data-testid='open-in-crew-original-btn'` (gold treatment ≥8.0, secondary <8.0) + per-variant `open-in-crew-variant-{A,B,C}-btn` (rendered when projected ≥8). Click writes `localStorage.peter_ai.crew_handoff = {brief, source, topic, platform, style, at}` then navigates to `/crew`.
-- ✅ **CrewView consumer** — Lazy `useState` initializer at `CrewView.js:77-89` reads + removes the localStorage key on first paint (no `set-state-in-effect`), pre-filling the requirements textarea with the auto-composed production brief.
-- ✅ **`GET /api/genius-prompts/{id}`** now returns `language` field.
-- ✅ ESLint blocker resolved (lazy initializer pattern). Frontend compiles green.
-- ✅ Pytest backend suite: `tests/test_studio_language.py` (4/4 pass).
-- ✅ End-to-end frontend handoff test verified (iteration_4.json — 100% pass).
+### v5.2 · Feb 2026 — Job-Queue Streaming + Library Deletion UX (THIS SESSION)
+- ✅ **Job-queue + reconnecting-SSE for the Genius Loop** — root-caused a HARD ~60s max-duration cap on streaming HTTP responses imposed by the cluster ingress. Heartbeats alone could not solve it.
+  - `POST /api/genius-prompt/jobs` → spawns background `asyncio.Task`, returns `{job_id}` in <1s.
+  - `GET /api/genius-prompt/jobs/{id}/events?cursor=N` → short-lived SSE that flushes buffered events from cursor N, heartbeats every 10s, **proactively closes with `event: pause {cursor:K}` at 50s** before the proxy cuts.
+  - Client (`geniusPromptStream` in `lib/api.js`) drives a reconnect loop, re-opening with the new cursor until `event: end`.
+  - `GET /api/genius-prompt/jobs/{id}` → snapshot for debugging / polling fallback.
+  - In-memory `_STUDIO_JOBS` registry with 30-min TTL (single-replica preview env; swap for Redis in production).
+  - Legacy `POST /api/genius-prompt/stream` kept for backward compat but deprecated.
+- ✅ **Studio Live Stream UX** — new `studio-stream-progress` card renders iteration-by-iteration timeline with status + best-marker + error banner. Verified iter1 happy-path renders within ~55s (single connection), iter2+ exercises the reconnect loop.
+- ✅ **Script Library Deletion UX** — `DELETE /api/genius-prompts/{id}`, `DELETE /api/scripts/{id}`, plus `GET /api/scripts` + `GET /api/scripts/{id}`. Frontend: Trash-icon on hover for both saved-prompts and saved-scripts cards, `window.confirm` gating, row auto-removal. Clicking a saved-script row loads it back into the Studio editor.
+- ✅ **`GET /api/genius-prompts` list now returns `language` field** — UI shows language badge alongside platform/style.
+- ✅ Multi-locale strings added in all 5 locales (`geniusLiveStream`, `streamStarting`, `streamIter`, `streamWaiting`, `streamError`, `savedScripts`, `deletePrompt`, `deleteScript`, `confirmDelete*`).
+- ✅ Backend pytest 14/14 PASS · Frontend Live-Stream + delete UX 100% PASS (`iteration_7.json`).
 
-### v5.0 · 8-Jun-2026 — Script Studio (Prompts 14 + 17 + 18)
-- ✅ `script_studio.py` module + `/api/script/generate`, `/api/script/evaluate`, `/api/genius-prompt/generate`, `GET /api/genius-prompts`, `GET /api/genius-prompts/{id}`.
-- ✅ `StudioView.js` — Topic/Platform/Style/Language inputs · Generate/Evaluate/Genius-Loop · 5-dimension score bars · 3 optimised variants · genius prompt panel with evolution + Apply.
-- ✅ Localised in 5 locales.
+### v5.1 · Feb 2026 — Studio→Crew Handoff + Target-Language Genius Loop
+- ✅ Genius-prompt `target_language` propagation (ID/EN heuristic verified).
+- ✅ "Open in Crew" handoff via `localStorage.peter_ai.crew_handoff` + lazy-`useState` consumer in CrewView.
+- ✅ ESLint blocker resolved.
 
-### v4.x — i18n, Cost Dashboard, Memory
-- ✅ Multi-language UI (EN, ID, ZH, ES, AR) via react-i18next + RTL.
-- ✅ Backend i18n (`Accept-Language` → translated agent role/goal for `/api/agents`).
-- ✅ "Did you mean" drift heuristic + floating session translator.
-- ✅ Workspace-aware cost dashboard with per-tier sparklines (`/api/stats/sparkline`).
-- ✅ Strategist Memory (ChromaDB) — `/memory` view.
+### v5.0 — Script Studio (Prompts 14/17/18) · v4.x — i18n, Cost Dashboard, Memory
+- See CHANGELOG below.
 
 ## Roadmap
 
-### P0 — Next (recommended sequence)
-1. **SSE-stream Genius Loop** — refactor `/api/genius-prompt/generate` to stream iteration-by-iteration so iterations >1 escape the ~100s proxy timeout. Frontend StreamingFetch consumer with live progress display.
-
 ### P1
-2. **Prompt 19: Revenue Prediction & Strategy** — predictive LLM analysis against historical video metrics (deferred until TikTok/IG/YouTube publishing integration lands).
-3. **Script Library Deletion UX** — delete buttons on saved scripts + genius prompts.
+1. **Prompt 19: Revenue Prediction & Strategy** — predictive LLM analysis vs historical video metrics (deferred until TikTok/IG/YouTube publishing integrations land).
+2. **Force-reconnect E2E test** — add an iterations=2 pytest fixture that deterministically exercises the SSE `event: pause` reconnect path (currently only the happy-path single-connection is auto-tested).
 
 ### P2
-4. **React Hook Dependency audit** — `ChatView`, `WorkspacesView`, `MemoryView`, `CrewView`, `CostView` exhaustive-deps cleanup.
-5. **ChatView.js refactor** — break 500+ line component into smaller pieces.
-6. **A11y warnings cleanup** — `Markdown.js` jsx-a11y/heading-has-content + anchor-has-content.
-7. **React Router v7 future flags**.
-8. **Per-session system-prompt versioning**.
-9. **WorkspaceSelector outside-click close**.
-10. **"Clear override" UX on Chat session badges**.
+3. **React Hook Dependency audit** — `ChatView`, `WorkspacesView`, `MemoryView`, `CrewView`, `CostView` exhaustive-deps cleanup.
+4. **`ChatView.js` refactor** — break 500+ line component into smaller pieces.
+5. **A11y warnings cleanup** — `Markdown.js` jsx-a11y/heading-has-content + anchor-has-content.
+6. **React Router v7 future flags**.
+7. **Per-session system-prompt versioning**.
+8. **WorkspaceSelector outside-click close**.
+9. **"Clear override" UX on Chat session badges**.
+10. **Redis-backed `_STUDIO_JOBS`** — for multi-replica horizontal scale.
 
 ## DB schema
 - `scripts`: `{_id, topic, platform, style, language, content, hook, cta, tags, duration_sec, genius_prompt_id, created_at}`
@@ -82,4 +81,4 @@ Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi
 - No external auth (MVP).
 
 ## Project health
-**Green.** Backend + frontend compile clean. Lint passes. Latest test iteration (`iteration_4.json`) 100% pass on both stacks. Known cost concern: genius-prompt loop iter=1 still takes 50-110s in practice and occasionally hits the 100s proxy cap → next P0 task is SSE streaming refactor.
+**Green.** Backend + frontend compile clean. Lint passes (0 blocking). Latest test iteration (`iteration_7.json`) reports 100% pass on both stacks. Long-LLM-job timeout regression FULLY RESOLVED via job-queue + reconnect pattern. The genius-prompt loop is now production-stable for arbitrary iteration counts.

@@ -1083,6 +1083,7 @@ async def genius_prompts_list() -> dict[str, Any]:
                 "topic": d.get("topic"),
                 "platform": d.get("platform"),
                 "style": d.get("style"),
+                "language": d.get("language"),
                 "expected_quality_score": d.get("expected_quality_score"),
                 "confidence": d.get("confidence"),
                 "best_iteration": d.get("best_iteration"),
