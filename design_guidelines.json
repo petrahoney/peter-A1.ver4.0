@@ -1,0 +1,140 @@
+{
+  "project_name": "PETER AI v4.0",
+  "theme": "dark",
+  "archetype": 5,
+  "archetype_name": "The Luxury Strategist",
+  "design_philosophy": "High-signal, deep focus, commanding, and premium. The interface acts as a luxury strategist's command center. The visual narrative treats AI orchestration as a sophisticated, traceable flow diagram with luxury materiality. No generic SaaS gradients, no neon cyberpunk. Focus on frosted dark surfaces, fine gold accents, and sharp typography.",
+  "colors": {
+    "background": "#080808",
+    "surface": {
+      "level_1": "#0A0F1E",
+      "level_2": "#141B2D",
+      "glass": "rgba(10, 15, 30, 0.65)"
+    },
+    "brand": {
+      "champagne_gold": "#C9A84C",
+      "gold_light": "#E8D5A3",
+      "gold_dark": "#8B6914",
+      "platinum_silver": "#C0C0C0"
+    },
+    "text": {
+      "primary": "#F5F5F0",
+      "secondary": "#888880",
+      "gold": "#C9A84C"
+    },
+    "borders": {
+      "subtle": "rgba(201, 168, 76, 0.15)",
+      "active": "rgba(201, 168, 76, 0.5)",
+      "glow": "rgba(201, 168, 76, 0.8)"
+    },
+    "status": {
+      "free": "#C0C0C0",
+      "cheap": "#E8D5A3",
+      "smart": "#C9A84C",
+      "critical": "#8B6914"
+    }
+  },
+  "typography": {
+    "fonts": {
+      "heading": "Cormorant Garamond, serif",
+      "body": "Montserrat, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "scale": {
+      "h1": "text-5xl sm:text-6xl font-light tracking-tight text-[#F5F5F0]",
+      "h2": "text-3xl sm:text-4xl font-light tracking-tight text-[#F5F5F0]",
+      "h3": "text-xl sm:text-2xl font-normal tracking-wide text-[#E8D5A3]",
+      "h4": "text-lg font-medium tracking-widest uppercase text-[#888880]",
+      "body": "text-base font-normal leading-relaxed text-[#F5F5F0]",
+      "small": "text-sm font-light text-[#888880]",
+      "micro_label": "text-xs font-semibold tracking-[0.2em] uppercase text-[#888880]"
+    },
+    "rules": {
+      "headings": "Use Cormorant Garamond exclusively for main titles, page headers, and marketing hooks. Never use bold; use font-light or font-normal.",
+      "body": "Use Montserrat for all UI controls, chat text, descriptions, and data tables.",
+      "numbers": "Use tabular-nums for cost and latency tracking for vertical alignment."
+    }
+  },
+  "surface_strategies": {
+    "glassmorphism": {
+      "usage": "Use selectively on floating navs, sidebars, and critical overlay panels.",
+      "classes": "bg-[#0A0F1E]/65 backdrop-blur-xl border border-[#C9A84C]/20 shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
+    },
+    "solid_cards": {
+      "usage": "Standard metric cards, chat bubbles, and settings panels.",
+      "classes": "bg-[#0A0F1E] border border-[#C9A84C]/15 rounded-lg shadow-sm"
+    },
+    "nodes": {
+      "usage": "React Flow nodes for Agent and Router diagrams.",
+      "classes": "bg-[#141B2D] border border-[#C9A84C]/40 rounded-md shadow-[0_0_15px_rgba(201,168,76,0.1)] px-4 py-3"
+    }
+  },
+  "spacing_and_layout": {
+    "general": "Generous spacing. Use p-6, p-8, or p-12 for container padding.",
+    "dashboard_grid": "Grid columns 12. Tightly packed 'Control Room' style with gap-6. Heights must align using h-full.",
+    "sidebar": "Fixed left sidebar, w-64 or w-72, glassmorphic or solid deep black.",
+    "main_content": "ml-64 (if fixed sidebar), min-h-screen bg-[#080808]."
+  },
+  "components": {
+    "diagrams": {
+      "library": "reactflow",
+      "instructions": "Crucial requirement: Render the router and CrewAI agents as live flow diagrams. Use custom React Flow nodes styled with luxury aesthetics (dark navy background, fine gold borders). Edges should be animated with stroke: '#C9A84C' and opacity: 0.6. Add a pulsing glow to active nodes using Tailwind animate-pulse or framer-motion."
+    },
+    "chat": {
+      "bubbles_user": "bg-[#141B2D] text-[#F5F5F0] border-l-2 border-[#C0C0C0] p-4 rounded-r-lg rounded-bl-lg",
+      "bubbles_ai": "bg-[#0A0F1E] text-[#F5F5F0] border border-[#C9A84C]/20 p-5 rounded-lg",
+      "badges": "Small pill badges indicating model tier (e.g., 'SMART | $0.012 | 1.2s'). Text sizes text-xs, font mono."
+    },
+    "buttons": {
+      "primary": "bg-[#C9A84C] text-[#080808] hover:bg-[#E8D5A3] transition-colors font-medium px-6 py-2 rounded-md",
+      "secondary": "bg-transparent text-[#C9A84C] border border-[#C9A84C] hover:bg-[#C9A84C]/10 transition-colors px-6 py-2 rounded-md",
+      "ghost": "text-[#888880] hover:text-[#F5F5F0] hover:bg-[#141B2D] transition-colors"
+    },
+    "charts": {
+      "library": "recharts",
+      "instructions": "For Cost & Usage dashboard. Use #C9A84C for main metrics, #8B6914 for secondary, #C0C0C0 for baseline. Remove default grid lines, use transparent backgrounds."
+    }
+  },
+  "views_and_features": {
+    "hero_command_center": {
+      "layout": "Central dashboard view greeting the user. Large typography for 'PETER AI', tagline 'Intelligence, Elevated.' Top-level aggregated stats (total saved, requests).",
+      "background": "Use abstract luxury dark gold technology background behind the hero metrics with high opacity overlay."
+    },
+    "ai_router_visualization": {
+      "layout": "A React Flow canvas taking up 60-70% of the screen or a prominent card. Shows query input node -> Classifier Node -> 4 Tier Nodes (Free, Cheap, Smart, Premium).",
+      "interaction": "Lines animate to show path taken. Model tiers rendered as elegant cards within the nodes."
+    },
+    "crewai_builder": {
+      "layout": "Split view. Left/Top: React Flow diagram of 7 agents (Architect, Frontend, Backend, DBA, DevOps, QA, Documenter) connected sequentially or hierarchically. Right/Bottom: Side panel revealing the real-time output/reasoning of the currently active agent."
+    },
+    "cost_dashboard": {
+      "layout": "Bento grid layout. 1 card for 'Total Saved', 1 for 'Queries Served', a donut chart for model distribution, and a dense, tabular data table at the bottom for recent queries. Use purely monochrome and gold colors."
+    }
+  },
+  "assets": {
+    "icons": {
+      "library": "@phosphor-icons/react",
+      "style": "weight='light' or weight='regular'. Keep them elegant and minimalist."
+    },
+    "images": {
+      "backgrounds": [
+        {
+          "url": "https://images.unsplash.com/photo-1761437856376-2ce1c483343b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGx1eHVyeSUyMGRhcmslMjBnb2xkJTIwdGVjaG5vbG9neSUyMGJhY2tncm91bmR8ZW58MHx8fHwxNzgwODEyNjM4fDA&ixlib=rb-4.1.0&q=85",
+          "description": "Abstract golden metallic strands on black background",
+          "usage": "Hero section background, strongly overlaid with bg-[#080808]/80 to keep text readable."
+        },
+        {
+          "url": "https://images.unsplash.com/photo-1625014618427-fbc980b974f5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODF8MHwxfHNlYXJjaHwyfHxhYnN0cmFjdCUyMG5ldXJhbCUyMG5ldHdvcmslMjBnb2xkJTIwZGFya3xlbnwwfHx8fDE3ODA4MTI2Mzh8MA&ixlib=rb-4.1.0&q=85",
+          "description": "Abstract neural network geometry",
+          "usage": "Use as a faint watermark background in the CrewAI agent diagram or Router view (opacity 10%)."
+        }
+      ]
+    }
+  },
+  "technical_rules": {
+    "framework": "React (.js), Tailwind CSS, Framer Motion, React Flow.",
+    "accessibility": "Contrast ratios must be high. Golden text on dark backgrounds usually passes, but ensure dim text (#888880) is large enough or brightened on hover.",
+    "testing": "All interactive and key informational elements MUST include a 'data-testid' attribute (e.g., data-testid='chat-submit-button', data-testid='model-tier-card').",
+    "animations": "Use smooth transitions (e.g., transition-all duration-300 ease-in-out). Don't make it frenetic; it should feel like high-end luxury machinery."
+  }
+}
