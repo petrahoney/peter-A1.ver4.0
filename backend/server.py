@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 
 from ai_router import AIRouter, TaskComplexity, TIER_CATALOG
 from crew_manager import PeterCrewManager, AGENT_BLUEPRINT
+from memory import StrategistMemory, MEMORY_TYPES
 
 load_dotenv()
 
@@ -41,7 +42,8 @@ EMERGENT_LLM_KEY = os.environ["EMERGENT_LLM_KEY"]
 mongo_client = AsyncIOMotorClient(MONGO_URL)
 db = mongo_client[DB_NAME]
 
-router_engine = AIRouter(api_key=EMERGENT_LLM_KEY, db=db)
+memory_engine = StrategistMemory(api_key=EMERGENT_LLM_KEY)
+router_engine = AIRouter(api_key=EMERGENT_LLM_KEY, db=db, memory=memory_engine)
 crew_engine = PeterCrewManager(api_key=EMERGENT_LLM_KEY, db=db, router=router_engine)
 
 app = FastAPI(title="PETER AI v4.0", version="4.0.0")
@@ -79,6 +81,11 @@ class CrewBuildRequest(BaseModel):
 class FeedbackRequest(BaseModel):
     query_id: str
     rating: int  # 1..5
+
+
+class MemoryCreateRequest(BaseModel):
+    content: str
+    type: Optional[str] = "note"
 
 
 # ───────────────────────── Health & Meta ─────────────────────────
@@ -191,6 +198,11 @@ async def chat(req: ChatRequest) -> dict[str, Any]:
 
     await db.sessions.update_one(
         {"_id": session_id}, {"$set": {"updated_at": now_iso()}}
+    )
+
+    # Fire-and-forget memory extraction.
+    asyncio.create_task(
+        memory_engine.extract_and_store(session_id, req.message, result["response"])
     )
 
     return {
@@ -424,6 +436,44 @@ async def stats() -> dict[str, Any]:
         "recent": recent,
         "tier_catalog": TIER_CATALOG,
     }
+
+
+# ───────────────────────── Strategist Memory ─────────────────────────
+
+
+@app.get("/api/memory")
+async def memory_list() -> dict[str, Any]:
+    items = await memory_engine.list_all(limit=500)
+    return {"count": len(items), "types": sorted(MEMORY_TYPES), "memories": items}
+
+
+@app.get("/api/memory/recall")
+async def memory_recall(q: str, limit: int = 5) -> dict[str, Any]:
+    if not q:
+        raise HTTPException(400, "query 'q' required")
+    items = await memory_engine.recall(q, limit=limit)
+    return {"query": q, "memories": items}
+
+
+@app.post("/api/memory")
+async def memory_create(req: MemoryCreateRequest) -> dict[str, Any]:
+    try:
+        item = await memory_engine.add_manual(req.content, req.type or "note")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return item
+
+
+@app.delete("/api/memory/{memory_id}")
+async def memory_delete(memory_id: str) -> dict[str, Any]:
+    await memory_engine.delete(memory_id)
+    return {"id": memory_id, "deleted": True}
+
+
+@app.delete("/api/memory")
+async def memory_clear() -> dict[str, Any]:
+    n = await memory_engine.clear_all()
+    return {"cleared": n}
 
 
 # ───────────────────────── Streaming chat (SSE) ─────────────────────────

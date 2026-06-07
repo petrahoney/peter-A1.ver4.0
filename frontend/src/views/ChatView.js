@@ -62,6 +62,64 @@ function StatsBadge({ m }) {
   );
 }
 
+function MemoriesAppliedBadge({ memories }) {
+  const [open, setOpen] = useState(false);
+  if (!memories || memories.length === 0) return null;
+  return (
+    <span className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        data-testid="memories-applied-badge"
+        className="text-[10px] inline-flex items-center gap-1 px-2 py-0.5 rounded-sm border tnum transition-colors"
+        style={{
+          color: "#C9A84C",
+          borderColor: "rgba(201,168,76,0.4)",
+          background: "rgba(218,165,32,0.08)",
+        }}
+        title="Memories PETER recalled for this turn"
+      >
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path d="M9.5 2A2.5 2.5 0 0112 4.5V7m-2.5-5A2.5 2.5 0 007 4.5m2.5-2.5v18m0 0A2.5 2.5 0 017 19.5m2.5 2.5a2.5 2.5 0 002.5-2.5m-2.5 2.5v-2.5M14.5 2A2.5 2.5 0 0017 4.5V7m-2.5-5A2.5 2.5 0 0112 4.5m2.5 17.5A2.5 2.5 0 0017 19.5m-2.5 2.5a2.5 2.5 0 01-2.5-2.5" />
+        </svg>
+        {memories.length} memor{memories.length === 1 ? "y" : "ies"} applied
+      </button>
+      {open ? (
+        <div
+          className="absolute left-0 mt-2 z-20 w-80 p-3 rounded-md shadow-goldStrong glass-strong"
+          data-testid="memories-applied-popover"
+        >
+          <div className="text-[10px] tracking-[0.3em] uppercase text-peter-dim mb-2">
+            Recalled for this turn
+          </div>
+          <ul className="space-y-2">
+            {memories.map((m) => (
+              <li key={m.id} className="text-[12px] leading-relaxed">
+                <span
+                  className="inline-block px-1.5 py-0.5 mr-2 text-[9px] uppercase tracking-widest rounded-sm border"
+                  style={{
+                    color: TIER_COLORS[m.tier] || "#C9A84C",
+                    borderColor: "rgba(201,168,76,0.3)",
+                  }}
+                >
+                  {m.type}
+                </span>
+                <span style={{ color: "#E5E5E5" }}>{m.content}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </span>
+  );
+}
+
 function MessageBubble({ m, streaming }) {
   const isUser = m.role === "user";
   const hasStats = !isUser && (m.cost_usd != null || m.tokens_estimated != null);
@@ -110,6 +168,9 @@ function MessageBubble({ m, streaming }) {
                 />
                 streaming
               </span>
+            ) : null}
+            {m.memories_used && m.memories_used.length > 0 ? (
+              <MemoriesAppliedBadge memories={m.memories_used} />
             ) : null}
           </div>
         ) : null}
@@ -384,7 +445,14 @@ export default function ChatView() {
             liveSessionId = meta.session_id;
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === aiId ? { ...m, tier: meta.tier, model: meta.model } : m,
+                m.id === aiId
+                  ? {
+                      ...m,
+                      tier: meta.tier,
+                      model: meta.model,
+                      memories_used: meta.memories_used || [],
+                    }
+                  : m,
               ),
             );
           },

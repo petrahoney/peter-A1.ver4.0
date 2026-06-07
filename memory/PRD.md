@@ -27,6 +27,14 @@ Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi
 | SMART     | Claude Sonnet 4.5          | claude-sonnet-4-5-20250929    | anthropic  | 0.0150 |
 | CRITICAL  | Claude Opus 4.5            | claude-opus-4-5-20251101      | anthropic  | 0.1500 |
 
+## Implemented (v2.0 · 7-Jun-2026 — Strategist Memory)
+- ✅ **ChromaDB-backed long-term recall** — new `/app/backend/memory.py` running an in-process `chromadb.PersistentClient` (cosine space, all-MiniLM-L6-v2 default embeddings) at `/app/backend/chroma_data`.
+- ✅ **Automatic extraction** — every chat turn fires a fire-and-forget Claude Haiku call that mines durable preferences / projects / facts / goals / themes / notes from the exchange and persists them. Extraction failures degrade gracefully (no chat impact).
+- ✅ **Automatic recall + injection** — before each turn the router does semantic top-5 recall (distance ≤ 0.85), builds a "What PETER remembers about you" context block and prepends it to the user message so reasoning compounds.
+- ✅ **Frontend `/memory` view** — luxury card grid grouped by type with filter chips, semantic search ("Recall"), inline "Teach PETER" manual entry with type selector, per-card delete, and a global "Forget all".
+- ✅ **In-chat indicator** — gold "N memories applied" badge in the assistant bubble; clicking opens a popover listing every recalled memory with its type chip.
+- ✅ **REST API** — `GET /api/memory`, `GET /api/memory/recall?q=…`, `POST /api/memory`, `DELETE /api/memory/{id}`, `DELETE /api/memory`.
+
 ## Implemented (v1.4 · 7-Jun-2026)
 - ✅ **Blinking gold ▌ cursor** at the tail of any streaming assistant bubble (CSS `cursor-blink` keyframe in `index.css`).
 - ✅ **Stats badge reformatted** to a single compact line: `Tier: X | Tokens: Y | Cost: $Z | Time: Ns | Saved: $S` on a soft-gold `rgba(218,165,32,0.1)` background with a thin champagne border. Backend `/api/chat/stream` `done` event now emits `tokens_estimated`.

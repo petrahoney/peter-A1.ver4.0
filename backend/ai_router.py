@@ -111,9 +111,10 @@ def estimate_tokens(text: str) -> int:
 
 
 class AIRouter:
-    def __init__(self, api_key: str, db) -> None:
+    def __init__(self, api_key: str, db, memory=None) -> None:
         self.api_key = api_key
         self.db = db
+        self.memory = memory  # StrategistMemory, may be None
         # Keep one LlmChat per session+tier so multi-turn history is preserved.
         self._sessions: dict[tuple[str, str], LlmChat] = {}
 
@@ -168,6 +169,19 @@ class AIRouter:
             self._sessions[key] = chat
         return chat
 
+    async def _prepare_query(
+        self, query: str, session_id: str
+    ) -> tuple[str, list[dict[str, Any]]]:
+        """Recall memories and prepend a context block to the user query."""
+        if not self.memory:
+            return query, []
+        memories = await self.memory.recall(query, limit=5)
+        if not memories:
+            return query, []
+        ctx = self.memory.build_context_block(memories)
+        composed = f"{ctx}\n\n## Current request from the user:\n{query}"
+        return composed, memories
+
     async def route_and_run(
         self,
         query: str,
@@ -177,11 +191,12 @@ class AIRouter:
         tier = forced or self.classify_query(query)
         meta = TIER_CATALOG[tier.value]
         chat = self._get_chat(session_id, tier)
+        composed, memories = await self._prepare_query(query, session_id)
 
         start = time.perf_counter()
         # Collect streamed deltas into a single response for the non-stream endpoint.
         response_text = ""
-        async for ev in chat.stream_message(UserMessage(text=query)):
+        async for ev in chat.stream_message(UserMessage(text=composed)):
             if isinstance(ev, TextDelta):
                 response_text += ev.content
             elif isinstance(ev, StreamDone):
@@ -204,6 +219,7 @@ class AIRouter:
             "saved_usd": saved_usd,
             "latency_ms": latency_ms,
             "tokens_estimated": tokens,
+            "memories_used": memories,
         }
 
     async def route_and_stream(
@@ -215,16 +231,17 @@ class AIRouter:
         tier = forced or self.classify_query(query)
         meta = TIER_CATALOG[tier.value]
         chat = self._get_chat(session_id, tier)
+        composed, memories = await self._prepare_query(query, session_id)
 
-        # First SSE event: routing metadata
+        # First SSE event: routing metadata + memory recall
         yield (
             "event: route\n"
-            f"data: {json.dumps({'tier': tier.value, 'model': meta['preview_model'], 'session_id': session_id})}\n\n"
+            f"data: {json.dumps({'tier': tier.value, 'model': meta['preview_model'], 'session_id': session_id, 'memories_used': memories})}\n\n"
         )
 
         start = time.perf_counter()
         full = ""
-        async for ev in chat.stream_message(UserMessage(text=query)):
+        async for ev in chat.stream_message(UserMessage(text=composed)):
             if isinstance(ev, TextDelta):
                 full += ev.content
                 yield (
@@ -260,7 +277,11 @@ class AIRouter:
             {"_id": session_id}, {"$set": {"updated_at": now_iso()}}
         )
 
+        # Fire-and-forget memory extraction so the stream isn't blocked.
+        if self.memory:
+            asyncio.create_task(self.memory.extract_and_store(session_id, query, full))
+
         yield (
             "event: done\n"
-            f"data: {json.dumps({'cost_usd': cost_usd, 'saved_usd': saved_usd, 'latency_ms': latency_ms, 'tier': tier.value, 'model': meta['preview_model'], 'tokens_estimated': tokens})}\n\n"
+            f"data: {json.dumps({'cost_usd': cost_usd, 'saved_usd': saved_usd, 'latency_ms': latency_ms, 'tier': tier.value, 'model': meta['preview_model'], 'tokens_estimated': tokens, 'memories_recalled': len(memories)})}\n\n"
         )

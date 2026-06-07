@@ -8,6 +8,7 @@ import {
   ChartLineUp,
   Sparkle,
   GearSix,
+  Brain,
 } from "@phosphor-icons/react";
 
 import HomeView from "./views/HomeView";
@@ -15,6 +16,7 @@ import ChatView from "./views/ChatView";
 import RouterView from "./views/RouterView";
 import CrewView from "./views/CrewView";
 import CostView from "./views/CostView";
+import MemoryView from "./views/MemoryView";
 import SettingsView from "./views/SettingsView";
 
 import "./App.css";
@@ -24,6 +26,7 @@ const NAV = [
   { to: "/chat", label: "Chat", icon: ChatCircleDots, testid: "nav-chat" },
   { to: "/router", label: "Router", icon: Graph, testid: "nav-router" },
   { to: "/crew", label: "Crew Builder", icon: UsersThree, testid: "nav-crew" },
+  { to: "/memory", label: "Memory", icon: Brain, testid: "nav-memory" },
   { to: "/cost", label: "Cost", icon: ChartLineUp, testid: "nav-cost" },
   { to: "/settings", label: "Settings", icon: GearSix, testid: "nav-settings" },
 ];
@@ -109,6 +112,7 @@ export default function App() {
           <Route path="/chat" element={<ChatView />} />
           <Route path="/router" element={<RouterView />} />
           <Route path="/crew" element={<CrewView />} />
+          <Route path="/memory" element={<MemoryView />} />
           <Route path="/cost" element={<CostView />} />
           <Route path="/settings" element={<SettingsView />} />
         </Routes>
