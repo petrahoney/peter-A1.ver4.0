@@ -859,20 +859,15 @@ async def genius_prompt_generate(req: GeniusPromptRequest) -> dict[str, Any]:
 
 @app.post("/api/genius-prompt/stream")
 async def genius_prompt_stream(req: GeniusPromptRequest) -> StreamingResponse:
-    """SSE variant — emits one `data:` line per iteration so the proxy stays
-    open during long multi-iteration runs (>100s).
-
-    A 10-second heartbeat (`: heartbeat\\n\\n` comment frame) is interleaved
-    while LLM calls are in flight so the cluster ingress idle-timer never
-    trips. The heartbeat is a SSE comment (not a `data:` line), so clients
-    ignore it transparently.
+    """[Legacy] Single-shot SSE variant — kept for tooling that does not
+    support the job-queue flow. Subject to the cluster ingress hard
+    max-duration cap (~60s); prefer POST /api/genius-prompt/jobs +
+    GET /api/genius-prompt/jobs/{id}/events for production use.
     """
 
     import json as _json
 
     async def event_source() -> AsyncIterator[bytes]:
-        # Initial comment line forces an immediate flush so the client opens
-        # the EventSource as soon as the request lands.
         yield b": studio-stream-open\n\n"
         final_payload: Optional[dict[str, Any]] = None
         errored = False
@@ -881,8 +876,6 @@ async def genius_prompt_stream(req: GeniusPromptRequest) -> StreamingResponse:
             req.topic, req.platform, req.style, req.target_score, req.iterations,
             target_language=req.target_language,
         )
-        # Race each generator step against a 10s heartbeat ticker so the
-        # proxy keeps seeing bytes while the LLM is thinking.
         next_task: Optional[asyncio.Task] = asyncio.create_task(gen.__anext__())
         try:
             while True:
@@ -912,7 +905,6 @@ async def genius_prompt_stream(req: GeniusPromptRequest) -> StreamingResponse:
             if next_task and not next_task.done():
                 next_task.cancel()
 
-        # Persist on the happy path only.
         if req.save and final_payload and not errored:
             try:
                 doc = {**final_payload, "_id": final_payload["id"]}
@@ -923,7 +915,6 @@ async def genius_prompt_stream(req: GeniusPromptRequest) -> StreamingResponse:
                     f"data: {_json.dumps({'type': 'warning', 'message': f'save_failed: {e}'}, ensure_ascii=False)}\n\n"
                 ).encode("utf-8")
 
-        # Polite SSE close.
         yield b"event: end\ndata: {}\n\n"
 
     return StreamingResponse(
@@ -935,6 +926,150 @@ async def genius_prompt_stream(req: GeniusPromptRequest) -> StreamingResponse:
             "Connection": "keep-alive",
         },
     )
+
+
+# ───────────── Job-queue pattern (proxy-safe long SSE) ─────────────
+#
+# The cluster ingress enforces a HARD ~60s max-duration on any single
+# streaming HTTP response — heartbeats alone cannot prevent disconnect.
+# Solution: decouple the long-running LLM job from the HTTP response.
+#   1. POST /api/genius-prompt/jobs                — spawns a background
+#      asyncio task, returns {job_id} in <100ms.
+#   2. GET /api/genius-prompt/jobs/{id}/events?cursor=N — opens a short-
+#      lived SSE that streams events accumulated by the background task
+#      starting at index N. The endpoint proactively closes with
+#      `event: pause` after ~50 wall-clock seconds (before the 60s cap),
+#      handing a fresh cursor back to the client which simply reconnects.
+#      The background job continues uninterrupted. When `final`/`error`
+#      arrives the endpoint sends `event: end` and the client stops
+#      reconnecting.
+
+_STUDIO_JOBS: dict[str, dict[str, Any]] = {}
+_STUDIO_JOB_TTL_SECONDS = 1800  # 30 minutes
+
+
+async def _purge_studio_job(job_id: str) -> None:
+    await asyncio.sleep(_STUDIO_JOB_TTL_SECONDS)
+    _STUDIO_JOBS.pop(job_id, None)
+
+
+async def _run_studio_job(job_id: str, req: GeniusPromptRequest) -> None:
+    job = _STUDIO_JOBS[job_id]
+    try:
+        async for event in studio_stream_genius_prompt(
+            req.topic, req.platform, req.style, req.target_score, req.iterations,
+            target_language=req.target_language,
+        ):
+            job["events"].append(event)
+            if event.get("type") == "final":
+                job["final"] = event.get("result")
+            if event.get("type") == "error":
+                job["errored"] = True
+    except Exception as e:
+        job["events"].append({"type": "error", "message": str(e)})
+        job["errored"] = True
+    finally:
+        job["done"] = True
+        if req.save and job.get("final") and not job.get("errored"):
+            try:
+                doc = {**job["final"], "_id": job["final"]["id"]}
+                del doc["id"]
+                await db.genius_prompts.insert_one(doc)
+            except Exception as e:
+                job["events"].append(
+                    {"type": "warning", "message": f"save_failed: {e}"}
+                )
+        # Schedule TTL cleanup so old jobs don't leak memory.
+        asyncio.create_task(_purge_studio_job(job_id))
+
+
+@app.post("/api/genius-prompt/jobs")
+async def create_genius_prompt_job(req: GeniusPromptRequest) -> dict[str, Any]:
+    job_id = uuid.uuid4().hex
+    _STUDIO_JOBS[job_id] = {
+        "events": [],
+        "done": False,
+        "errored": False,
+        "final": None,
+        "created_at": time.monotonic(),
+    }
+    asyncio.create_task(_run_studio_job(job_id, req))
+    return {"job_id": job_id}
+
+
+@app.get("/api/genius-prompt/jobs/{job_id}/events")
+async def stream_genius_prompt_job(job_id: str, cursor: int = 0) -> StreamingResponse:
+    if job_id not in _STUDIO_JOBS:
+        raise HTTPException(404, "job not found")
+
+    import json as _json
+
+    async def event_source() -> AsyncIterator[bytes]:
+        yield b": studio-job-open\n\n"
+        start = time.monotonic()
+        local_cursor = max(0, int(cursor))
+        last_heartbeat = time.monotonic()
+
+        while True:
+            job = _STUDIO_JOBS.get(job_id)
+            if job is None:
+                # TTL cleanup raced — close politely.
+                yield b"event: end\ndata: {}\n\n"
+                return
+
+            # Flush any buffered events at/after the cursor.
+            while local_cursor < len(job["events"]):
+                ev = job["events"][local_cursor]
+                local_cursor += 1
+                yield f"data: {_json.dumps(ev, ensure_ascii=False)}\n\n".encode("utf-8")
+                if ev.get("type") in ("final", "error"):
+                    yield b"event: end\ndata: {}\n\n"
+                    return
+
+            # Job completed but emitted no terminal event — close cleanly.
+            if job["done"]:
+                yield b"event: end\ndata: {}\n\n"
+                return
+
+            # Proactively close before the proxy's hard cap (~60s).
+            elapsed = time.monotonic() - start
+            if elapsed > 50:
+                yield (
+                    f"event: pause\ndata: {_json.dumps({'cursor': local_cursor})}\n\n"
+                ).encode("utf-8")
+                return
+
+            # Heartbeat every ~10s while waiting for the next event.
+            if time.monotonic() - last_heartbeat > 10:
+                yield b": heartbeat\n\n"
+                last_heartbeat = time.monotonic()
+
+            await asyncio.sleep(0.5)
+
+    return StreamingResponse(
+        event_source(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@app.get("/api/genius-prompt/jobs/{job_id}")
+async def get_genius_prompt_job(job_id: str) -> dict[str, Any]:
+    """Snapshot endpoint — useful for debugging or polling fallback."""
+    job = _STUDIO_JOBS.get(job_id)
+    if job is None:
+        raise HTTPException(404, "job not found")
+    return {
+        "job_id": job_id,
+        "done": job["done"],
+        "errored": job["errored"],
+        "event_count": len(job["events"]),
+        "final": job["final"],
+    }
 
 
 @app.get("/api/genius-prompts")

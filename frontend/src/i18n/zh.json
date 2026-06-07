@@ -200,6 +200,7 @@
     "deletePrompt": "删除提示词",
     "deleteScript": "删除脚本",
     "confirmDeletePrompt": "删除这个已保存的天才提示词吗?",
-    "confirmDeleteScript": "删除这个已保存的脚本吗?"
+    "confirmDeleteScript": "删除这个已保存的脚本吗?",
+    "streamError": "流中断"
   }
 }

@@ -200,6 +200,7 @@
     "deletePrompt": "Delete prompt",
     "deleteScript": "Delete script",
     "confirmDeletePrompt": "Delete this saved genius prompt?",
-    "confirmDeleteScript": "Delete this saved script?"
+    "confirmDeleteScript": "Delete this saved script?",
+    "streamError": "Stream interrupted"
   }
 }

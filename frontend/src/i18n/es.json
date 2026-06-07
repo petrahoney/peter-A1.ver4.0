@@ -200,6 +200,7 @@
     "deletePrompt": "Eliminar prompt",
     "deleteScript": "Eliminar guion",
     "confirmDeletePrompt": "¿Eliminar este prompt genio guardado?",
-    "confirmDeleteScript": "¿Eliminar este guion guardado?"
+    "confirmDeleteScript": "¿Eliminar este guion guardado?",
+    "streamError": "Transmisión interrumpida"
   }
 }

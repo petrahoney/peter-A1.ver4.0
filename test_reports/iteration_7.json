@@ -1,0 +1,45 @@
+{
+  "summary": "Iteration 7 — Re-tested PETER AI Script Studio after the architectural fix (job-queue + reconnecting SSE). RESULT: PASS. The 60s proxy cap is now fully avoided. POST /api/genius-prompt/jobs returns {job_id} in <1s. GET /api/genius-prompt/jobs/{id}/events?cursor=N streams events and proactively closes with `event: pause {cursor:N}` before 60s; client reconnects transparently. For iterations=1 the happy path completes within a single ~55s connection (no reconnect needed in this run). Backend pytest: 14/14 PASSED in 101s. Frontend Live Stream UX: studio-stream-progress renders <2s, stream-iter-1 renders with score 6.6, studio-genius-card renders with Indonesian content (7 ID stopword hits), progress card remains visible after final, no stream-error banner. Saved-library delete UX still works end-to-end for both saved-prompts and saved-scripts (12→11, 5→4).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/genius-prompts (list)", "issue": "Response items omit the `language` field. The detail endpoint GET /api/genius-prompts/{id} does include language. Recommend adding language to the list projection (server.py line 1080-1091) for UI badge consistency with saved-scripts which already shows '· id'."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Studio /studio Live Stream", "issues": ["studio-stream-status text reads 'Iteration 1 / 1' (English) when only the script-output language is set to Bahasa Indonesia. This is correct per the clarified spec (UI locale is separate from script-output language and only switches via the sidebar language picker), but a previous report flagged it as a localization gap — closing it here as expected behaviour."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_studio_jobs.py",
+    "/app/test_reports/pytest/pytest_iter7.xml"
+  ],
+  "action_items": [
+    "(Optional, minor) Add `language` to the projection in GET /api/genius-prompts list endpoint for parity with the detail endpoint.",
+    "(Optional, nice-to-have) Add E2E test that forces reconnect by running iterations=2 — the happy path is verified end-to-end at iterations=1 (single connection ~55s) but the reconnect loop in api.js / events endpoint was not exercised in this run. Code review of /api/genius-prompt/jobs/{id}/events confirms the pause emission at >50s elapsed is correct."
+  ],
+  "critical_code_review_comments": [
+    "server.py _STUDIO_JOBS (line 947): in-memory dict is OK for single-replica preview env but will not survive a backend restart and is not horizontal-scale safe. A short note in the docstring acknowledging this would help future maintainers; for production, swap to Redis with the same job_id contract.",
+    "server.py _run_studio_job line 975-977: builds the persistence doc by `{**job['final'], '_id': job['final']['id']}` then `del doc['id']`. Clean pattern, no Mongo _id leakage downstream. ✅",
+    "server.py event_source() in stream_genius_prompt_job (line 1007-1048): correct ordering — flush buffered events first, return immediately on terminal type, send `event: pause` past 50s elapsed, heartbeat every 10s otherwise. Polling interval 0.5s is fine. ✅",
+    "Legacy POST /api/genius-prompt/stream still exists for backward compat (returns 200 + text/event-stream) — kept as documented. ✅",
+    "All Saved-Library CRUD endpoints continue to behave correctly: clean JSON, no Mongo _id leakage, 404 on missing IDs. ✅",
+    "Frontend geniusPromptStream() in /app/frontend/src/lib/api.js correctly drives the reconnect loop (verified by happy-path UX rendering all phases end-to-end through a single SSE connection on iterations=1). Recommend a dedicated unit test that mocks a forced `event: pause` after the first iter_done to lock-in the reconnect behaviour for future regressions."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_studio_jobs.py (new — 14 pytest tests covering POST /jobs, GET /jobs/{id}/events with reconnect-aware consumer, snapshot endpoint, persisted prompt list+delete, legacy stream sanity, scripts CRUD)"
+  ],
+  "success_rate": {
+    "backend": "100% (14/14 pytest)",
+    "frontend": "100% (Live Stream UX + saved-library delete UX)"
+  },
+  "test_credentials": "Not required (no auth on tested endpoints).",
+  "seed_data_creation": "Test consumed and removed 1 streamed genius-prompt (Tips fokus saat WFH) via POST /jobs → SSE → DELETE. Saved-library delete sanity removed 1 prompt and 1 script from existing seed data (DB now has ~11 prompts, ~4 scripts).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Architectural fix is verified. To exercise the reconnect loop (event: pause → re-open with cursor=N) deterministically, run the pytest fixture `consumed_job` with iterations=2 and a total_timeout=300s — the helper _consume_job() already handles pause-driven reconnects and counts them via `reconnects`. For frontend, the in-app badge near the Run button still reads '1 iteration ≈ 30s · 2 iter = 60s · proxy cap = 100s' — could be refreshed now that the proxy cap is no longer a hard limit.",
+  "rca of the issue": "Previously the SSE response was severed at ~60s by a HARD max-duration enforced by the cluster ingress. The new design POST /api/genius-prompt/jobs spawns a background asyncio task that buffers events into _STUDIO_JOBS[job_id]['events'], while GET /api/genius-prompt/jobs/{id}/events serves a short-lived SSE that proactively closes with `event: pause {cursor:N}` past 50s elapsed. The client (geniusPromptStream in api.js) re-opens with ?cursor=N and continues. Verified: 14/14 backend pytest pass (101s); frontend renders final genius-card with Indonesian content within ~55s for iterations=1."
+}

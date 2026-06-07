@@ -200,6 +200,7 @@
     "deletePrompt": "حذف الـ prompt",
     "deleteScript": "حذف السكربت",
     "confirmDeletePrompt": "حذف هذا الـ Genius prompt المحفوظ؟",
-    "confirmDeleteScript": "حذف هذا السكربت المحفوظ؟"
+    "confirmDeleteScript": "حذف هذا السكربت المحفوظ؟",
+    "streamError": "تم قطع البث"
   }
 }

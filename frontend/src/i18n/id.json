@@ -200,6 +200,7 @@
     "deletePrompt": "Hapus prompt",
     "deleteScript": "Hapus skrip",
     "confirmDeletePrompt": "Hapus genius prompt tersimpan ini?",
-    "confirmDeleteScript": "Hapus skrip tersimpan ini?"
+    "confirmDeleteScript": "Hapus skrip tersimpan ini?",
+    "streamError": "Streaming terputus"
   }
 }

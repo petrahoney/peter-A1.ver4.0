@@ -80,6 +80,7 @@ export default function StudioView() {
   // [{iteration, score, change, weaknesses, is_best, skipped}, ...]
   const [iterEvents, setIterEvents] = useState([]);
   const [streamStatus, setStreamStatus] = useState(""); // "iter 2 / 3" etc.
+  const [streamError, setStreamError] = useState("");
 
   const [generating, setGenerating] = useState(false);
   const [evaluating, setEvaluating] = useState(false);
@@ -183,6 +184,7 @@ export default function StudioView() {
     setGenius(null);
     setIterEvents([]);
     setStreamStatus("");
+    setStreamError("");
     setIteratingGenius(true);
     try {
       const finalResult = await geniusPromptStream(
@@ -212,6 +214,7 @@ export default function StudioView() {
       if (finalResult) setGenius(finalResult);
       refreshSavedPrompts();
     } catch (e) {
+      setStreamError(e?.message || String(e));
       logErr("StudioView.geniusLoop")(e);
     } finally {
       setIteratingGenius(false);
@@ -372,8 +375,8 @@ export default function StudioView() {
         </span>
       </div>
 
-      {/* Live Stream Progress (visible during iteration) */}
-      {(iteratingGenius || iterEvents.length > 0) && (
+      {/* Live Stream Progress (visible during iteration or while showing results/errors) */}
+      {(iteratingGenius || iterEvents.length > 0 || streamError) && (
         <div
           className="mt-4 p-3 rounded-md border border-peter-gold/30 bg-peter-gold/[0.04]"
           data-testid="studio-stream-progress"
@@ -396,6 +399,14 @@ export default function StudioView() {
               </span>
             ) : null}
           </div>
+          {streamError ? (
+            <div
+              className="text-[11px] text-red-300 bg-red-500/10 border border-red-500/30 rounded-sm px-2 py-1.5 mb-2"
+              data-testid="studio-stream-error"
+            >
+              {t("studio.streamError") || "Stream interrupted"}: {streamError}
+            </div>
+          ) : null}
           {iterEvents.length === 0 && iteratingGenius ? (
             <div className="text-[11px] text-peter-dim/80 italic">
               {t("studio.streamWaiting") || "Designing meta-prompt…"}

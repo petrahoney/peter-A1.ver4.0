@@ -84,61 +84,97 @@ export const geniusPromptGenerate = (body) =>
   api.post("/genius-prompt/generate", body, { timeout: 95000 }).then((r) => r.data);
 
 /**
- * Streaming variant of the genius-prompt loop. Posts to /genius-prompt/stream
- * (SSE response) and invokes `onEvent` for every parsed event from the server.
- * Resolves with the final payload (object) once `event: end` arrives, or
- * rejects on network failure / explicit {type:"error"} server event.
+ * Job-queue + reconnecting SSE consumer for the genius-prompt loop.
  *
- * @param {object} body  request body (same shape as geniusPromptGenerate)
+ *   1. POST /api/genius-prompt/jobs  → returns {job_id}
+ *   2. GET  /api/genius-prompt/jobs/{id}/events?cursor=N (SSE)
+ *      • Streams events from cursor N. Proactively closes with
+ *        `event: pause {cursor: K}` after ~50s (before the 60s proxy cap).
+ *      • Client reconnects with the new cursor until `event: end` arrives.
+ *
+ * @param {object} body  request body (same shape as before)
  * @param {function} onEvent  called for every parsed event dict
  * @param {AbortSignal=} signal  optional abort signal
  * @returns {Promise<object|null>} the final.result payload, or null if none
  */
 export async function geniusPromptStream(body, onEvent, signal) {
-  const resp = await fetch(`${API}/genius-prompt/stream`, {
+  const lng = (i18n && i18n.language) || "en";
+  // Step 1: spawn the background job.
+  const jobResp = await fetch(`${API}/genius-prompt/jobs`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Accept-Language": (i18n && i18n.language) || "en",
-    },
+    headers: { "Content-Type": "application/json", "Accept-Language": lng },
     body: JSON.stringify(body),
     signal,
   });
-  if (!resp.ok || !resp.body) {
-    throw new Error(`stream HTTP ${resp.status}`);
-  }
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder("utf-8");
-  let buf = "";
+  if (!jobResp.ok) throw new Error(`job create HTTP ${jobResp.status}`);
+  const { job_id } = await jobResp.json();
+
+  let cursor = 0;
   let finalResult = null;
   let serverError = null;
 
-  // SSE frames are separated by \n\n; each frame is one or more `data:` /
-  // `event:` lines. We accumulate bytes and split on the blank-line marker.
+  // Step 2: reconnecting SSE loop.
   for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    let idx;
-    while ((idx = buf.indexOf("\n\n")) !== -1) {
-      const frame = buf.slice(0, idx);
-      buf = buf.slice(idx + 2);
-      const dataLines = frame
-        .split("\n")
-        .filter((l) => l.startsWith("data:"))
-        .map((l) => l.slice(5).trimStart());
-      if (!dataLines.length) continue;
-      const raw = dataLines.join("\n");
-      try {
-        const event = JSON.parse(raw);
-        onEvent && onEvent(event);
-        if (event.type === "final") finalResult = event.result;
-        if (event.type === "error") serverError = event.message || "stream error";
-      } catch {
-        // Ignore unparseable comments / heartbeats.
+    if (signal?.aborted) break;
+    const url = `${API}/genius-prompt/jobs/${job_id}/events?cursor=${cursor}`;
+    const resp = await fetch(url, {
+      method: "GET",
+      headers: { "Accept-Language": lng },
+      signal,
+    });
+    if (!resp.ok || !resp.body) {
+      throw new Error(`stream HTTP ${resp.status}`);
+    }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buf = "";
+    let endReached = false;
+    let paused = false;
+
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf("\n\n")) !== -1) {
+        const frame = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        let eventName = null;
+        const dataLines = [];
+        for (const line of frame.split("\n")) {
+          if (line.startsWith("event:")) eventName = line.slice(6).trim();
+          else if (line.startsWith("data:")) dataLines.push(line.slice(5).trimStart());
+        }
+        if (!dataLines.length) continue;
+        let parsed;
+        try {
+          parsed = JSON.parse(dataLines.join("\n"));
+        } catch {
+          continue; // ignore unparseable
+        }
+        if (eventName === "end") {
+          endReached = true;
+        } else if (eventName === "pause") {
+          paused = true;
+          if (typeof parsed.cursor === "number") cursor = parsed.cursor;
+        } else {
+          // Regular data event — forward + advance cursor.
+          onEvent && onEvent(parsed);
+          cursor += 1;
+          if (parsed.type === "final") finalResult = parsed.result;
+          if (parsed.type === "error") serverError = parsed.message || "stream error";
+        }
       }
     }
+
+    if (endReached || serverError) break;
+    if (!paused) {
+      // Unexpected close (proxy cut, network hiccup) — reconnect with same cursor.
+      // Brief backoff to avoid hammering the proxy.
+      await new Promise((r) => setTimeout(r, 300));
+    }
   }
+
   if (serverError) throw new Error(serverError);
   return finalResult;
 }
