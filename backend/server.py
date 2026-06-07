@@ -946,6 +946,11 @@ async def genius_prompt_stream(req: GeniusPromptRequest) -> StreamingResponse:
 
 _STUDIO_JOBS: dict[str, dict[str, Any]] = {}
 _STUDIO_JOB_TTL_SECONDS = 1800  # 30 minutes
+# Default wall-clock seconds before a single GET /jobs/{id}/events
+# connection emits `event: pause` and closes. Production is 50s
+# (under the ~60s ingress cap); tests can override per-request via the
+# `?pause_seconds=` query param.
+_SSE_PAUSE_SECONDS = 50.0
 
 
 async def _purge_studio_job(job_id: str) -> None:
@@ -998,11 +1003,19 @@ async def create_genius_prompt_job(req: GeniusPromptRequest) -> dict[str, Any]:
 
 
 @app.get("/api/genius-prompt/jobs/{job_id}/events")
-async def stream_genius_prompt_job(job_id: str, cursor: int = 0) -> StreamingResponse:
+async def stream_genius_prompt_job(
+    job_id: str,
+    cursor: int = 0,
+    pause_seconds: Optional[float] = None,
+) -> StreamingResponse:
     if job_id not in _STUDIO_JOBS:
         raise HTTPException(404, "job not found")
 
     import json as _json
+
+    # Per-request override (used by tests to force fast reconnects);
+    # production callers omit the param and get the safe default.
+    pause_after = pause_seconds if pause_seconds is not None else _SSE_PAUSE_SECONDS
 
     async def event_source() -> AsyncIterator[bytes]:
         yield b": studio-job-open\n\n"
@@ -1033,7 +1046,7 @@ async def stream_genius_prompt_job(job_id: str, cursor: int = 0) -> StreamingRes
 
             # Proactively close before the proxy's hard cap (~60s).
             elapsed = time.monotonic() - start
-            if elapsed > 50:
+            if elapsed > pause_after:
                 yield (
                     f"event: pause\ndata: {_json.dumps({'cursor': local_cursor})}\n\n"
                 ).encode("utf-8")
@@ -1070,6 +1083,56 @@ async def get_genius_prompt_job(job_id: str) -> dict[str, Any]:
         "event_count": len(job["events"]),
         "final": job["final"],
     }
+
+
+# ───────────── Test-only synthetic-job helper (no LLM) ─────────────
+#
+# Lets the reconnect-path pytest exercise the full job-queue + SSE-pause
+# flow without paying for a 60-200s real LLM run. The endpoint is named
+# with a `_test` segment so it never collides with production routes; it
+# does not require auth (preview env has no auth) and is harmless — it
+# just buffers synthetic events into _STUDIO_JOBS the same way the real
+# job runner does.
+
+
+class SyntheticJobRequest(BaseModel):
+    events: list[dict[str, Any]]
+    drip_ms: int = 200  # delay between events to force the wait-loop
+
+
+@app.post("/api/_test/genius-prompt/synthetic-job")
+async def create_synthetic_genius_job(req: SyntheticJobRequest) -> dict[str, Any]:
+    """Create a job whose events are drip-fed by a background task.
+
+    Tests use this to deterministically exercise the SSE reconnect path:
+    set `drip_ms` larger than the desired `pause_seconds` so the first
+    connection times out into `event: pause` before all events arrive.
+    """
+    job_id = uuid.uuid4().hex
+    _STUDIO_JOBS[job_id] = {
+        "events": [],
+        "done": False,
+        "errored": False,
+        "final": None,
+        "created_at": time.monotonic(),
+    }
+
+    async def _drip() -> None:
+        job = _STUDIO_JOBS[job_id]
+        try:
+            for ev in req.events:
+                await asyncio.sleep(req.drip_ms / 1000.0)
+                job["events"].append(ev)
+                if ev.get("type") == "final":
+                    job["final"] = ev.get("result")
+                if ev.get("type") == "error":
+                    job["errored"] = True
+        finally:
+            job["done"] = True
+            asyncio.create_task(_purge_studio_job(job_id))
+
+    asyncio.create_task(_drip())
+    return {"job_id": job_id}
 
 
 @app.get("/api/genius-prompts")

@@ -31,7 +31,13 @@ Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi
 
 ## Implemented
 
-### v5.2 · Feb 2026 — Job-Queue Streaming + Library Deletion UX (THIS SESSION)
+### v5.3 · Feb 2026 — Deterministic Reconnect-Path Test (THIS SESSION)
+- ✅ **`?pause_seconds=` query param** on `GET /api/genius-prompt/jobs/{id}/events` lets tests override the 50s production threshold per-request.
+- ✅ **`POST /api/_test/genius-prompt/synthetic-job`** — test-only endpoint that creates a job whose events are drip-fed from a request payload, bypassing real LLM cost. Mirrors the production event shape.
+- ✅ **`/app/backend/tests/test_studio_reconnect.py`** (4/4 PASS in ~6s) — deterministic coverage of: first connection emits `event: pause` with cursor, reconnect with that cursor receives the rest and `event: end`, the union of frames matches the expected order with no gaps/duplicates, snapshot endpoint reflects completion, default `pause_seconds=50` is not 0.5 (production-default sanity).
+- ✅ Full pytest suite now 18/18 PASS (`test_studio_jobs.py` 14 + `test_studio_reconnect.py` 4).
+
+### v5.2 · Feb 2026 — Job-Queue Streaming + Library Deletion UX
 - ✅ **Job-queue + reconnecting-SSE for the Genius Loop** — root-caused a HARD ~60s max-duration cap on streaming HTTP responses imposed by the cluster ingress. Heartbeats alone could not solve it.
   - `POST /api/genius-prompt/jobs` → spawns background `asyncio.Task`, returns `{job_id}` in <1s.
   - `GET /api/genius-prompt/jobs/{id}/events?cursor=N` → short-lived SSE that flushes buffered events from cursor N, heartbeats every 10s, **proactively closes with `event: pause {cursor:K}` at 50s** before the proxy cuts.
@@ -57,7 +63,6 @@ Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi
 
 ### P1
 1. **Prompt 19: Revenue Prediction & Strategy** — predictive LLM analysis vs historical video metrics (deferred until TikTok/IG/YouTube publishing integrations land).
-2. **Force-reconnect E2E test** — add an iterations=2 pytest fixture that deterministically exercises the SSE `event: pause` reconnect path (currently only the happy-path single-connection is auto-tested).
 
 ### P2
 3. **React Hook Dependency audit** — `ChatView`, `WorkspacesView`, `MemoryView`, `CrewView`, `CostView` exhaustive-deps cleanup.
