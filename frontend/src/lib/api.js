@@ -15,6 +15,14 @@ export const stats = (workspace_id) => {
   return api.get(`/stats${q}`).then((r) => r.data);
 };
 
+export const statsSparkline = (workspace_id, days = 7) => {
+  const params = new URLSearchParams();
+  if (workspace_id) params.set("workspace_id", workspace_id);
+  if (days) params.set("days", String(days));
+  const qs = params.toString();
+  return api.get(`/stats/sparkline${qs ? `?${qs}` : ""}`).then((r) => r.data);
+};
+
 export const classify = (query) =>
   api.post("/router/classify", { query }).then((r) => r.data);
 

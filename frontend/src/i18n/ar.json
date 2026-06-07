@@ -1,0 +1,76 @@
+{
+  "nav": {
+    "command": "القيادة",
+    "chat": "المحادثة",
+    "router": "الموجّه",
+    "crew": "بناء الفريق",
+    "memory": "الذاكرة",
+    "workspaces": "مساحات العمل",
+    "cost": "التكلفة",
+    "settings": "الإعدادات"
+  },
+  "sidebar": {
+    "sessions": "الجلسات",
+    "new": "جديدة",
+    "noSessions": "لا توجد جلسات بعد. ابدأ محادثة لإنشاء واحدة.",
+    "allWorkspaces": "كل مساحات العمل",
+    "manageWorkspaces": "إدارة مساحات العمل",
+    "footerBrand": "PETER AI v4.0 — Intelligence, Elevated. Built in Indonesia.",
+    "language": "اللغة"
+  },
+  "chat": {
+    "title": "مجلس خاص",
+    "label": "محادثة",
+    "placeholder": "تحدّث مع PETER…",
+    "send": "إرسال",
+    "stop": "إيقاف",
+    "queued": "{{count}} رسالة في الطابور",
+    "queued_plural": "{{count}} رسائل في الطابور",
+    "memoryOn": "الذاكرة مفعّلة",
+    "memoryOff": "الذاكرة مُعطّلة",
+    "forceTier": "فرض المستوى",
+    "auto": "تلقائي",
+    "howMayIAssist": "كيف يمكنني المساعدة؟",
+    "subtitle": "اسأل أيّ شيء — حسابًا، تعريفًا، مراجعة استراتيجية عميقة. يختار PETER النموذج الأنسب في أجزاء من الثانية.",
+    "suggest1": "كم الساعة الآن في طوكيو؟",
+    "suggest2": "حلّل المخاطر الاستراتيجية للتوسّع إلى أوروبا في 2026.",
+    "suggest3": "اشرح الفرق بين البرمجة كائنية التوجّه والبرمجة الوظيفية.",
+    "rename": "إعادة تسمية",
+    "delete": "حذف",
+    "confirmDelete": "حذف «{{title}}»؟"
+  },
+  "cost": {
+    "label": "التكلفة والاستخدام",
+    "title": "سجل",
+    "titleAccent": "التوفير",
+    "totalQueries": "إجمالي الاستعلامات",
+    "totalCost": "إجمالي التكلفة",
+    "savedVsPremium": "التوفير مقابل Premium",
+    "avgLatency": "متوسط الزمن",
+    "lifetime": "الإجمالي",
+    "acrossAllTiers": "عبر كل المستويات",
+    "ifPremium": "إذا نُفّذ كل استعلام على Claude Opus",
+    "meanAcrossTiers": "متوسط المستويات",
+    "distributionByTier": "التوزيع حسب المستوى",
+    "spendVsSavings": "الإنفاق مقابل التوفير لكل مستوى",
+    "recentQueries": "الاستعلامات الأخيرة",
+    "noQueriesYet": "لا استعلامات بعد. افتح المحادثة للبدء.",
+    "scope": "النطاق",
+    "sparkline": "التوفير — آخر 7 أيام",
+    "sparklineHint": "خطوط ذهبية صغيرة لكل مستوى. تتبع مساحة العمل النشطة.",
+    "noActivity": "لا نشاط بعد."
+  },
+  "settings": {
+    "label": "الإعدادات",
+    "title": "اضبط الاستراتيجي",
+    "aboutTitle": "حول PETER",
+    "languageTitle": "لغة الواجهة",
+    "languageHint": "تترجم الواجهة. يكتشف PETER لغتك في المحادثة ويردّ بنفس اللغة تلقائيًّا."
+  },
+  "common": {
+    "loading": "جارٍ التحميل…",
+    "close": "إغلاق",
+    "save": "حفظ",
+    "cancel": "إلغاء"
+  }
+}

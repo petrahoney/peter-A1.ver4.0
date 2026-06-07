@@ -1,25 +1,41 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { tiers } from "../lib/api";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 
 export default function SettingsView() {
-  const [t, setT] = useState({});
+  const { t: i18nT } = useTranslation();
+  const [tierMap, setTierMap] = useState({});
   useEffect(() => {
-    tiers().then((r) => setT(r.tiers)).catch(() => {});
+    tiers().then((r) => setTierMap(r.tiers)).catch(() => {});
   }, []);
 
   return (
     <div className="p-12">
       <div className="text-[11px] tracking-[0.32em] uppercase text-peter-dim">
-        Settings
+        {i18nT("settings.label")}
       </div>
       <h1 className="h-display text-4xl text-peter-ivory mt-1">
-        The <em className="text-peter-gold not-italic">configuration</em>
+        {i18nT("settings.title")}
       </h1>
 
-      {/* About */}
-      <div className="mt-8 p-6 bg-peter-navy/40 border border-peter-gold/15 rounded-lg">
+      {/* Language switcher */}
+      <div className="mt-8 p-6 bg-peter-navy/40 border border-peter-gold/15 rounded-lg max-w-3xl">
         <div className="text-[10px] tracking-[0.3em] uppercase text-peter-dim mb-2">
-          About PETER
+          {i18nT("settings.languageTitle")}
+        </div>
+        <div className="mt-2 max-w-sm">
+          <LanguageSwitcher variant="settings" />
+        </div>
+        <p className="mt-3 text-xs text-peter-dim/80 font-light leading-relaxed">
+          {i18nT("settings.languageHint")}
+        </p>
+      </div>
+
+      {/* About */}
+      <div className="mt-6 p-6 bg-peter-navy/40 border border-peter-gold/15 rounded-lg">
+        <div className="text-[10px] tracking-[0.3em] uppercase text-peter-dim mb-2">
+          {i18nT("settings.aboutTitle")}
         </div>
         <div className="h-display text-2xl text-peter-ivory">
           Personal Enhanced Thinking &amp; Execution Robot
@@ -44,7 +60,7 @@ export default function SettingsView() {
       </p>
 
       <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-        {Object.values(t).map((tier) => (
+        {Object.values(tierMap).map((tier) => (
           <div
             key={tier.id}
             className="p-6 bg-peter-navy/40 border border-peter-gold/15 rounded-lg"
@@ -88,7 +104,7 @@ docker compose up -d
         </pre>
       </div>
 
-      <div className="mt-8 text-center text-[10px] tracking-[0.32em] uppercase text-peter-dim/60">
+      <div className="mt-8 text-center text-[10px] tracking-[0.32em] uppercase text-peter-dim/60" dir="ltr">
         PETER AI v4.0 — Intelligence, Elevated. Built in Indonesia.
       </div>
     </div>

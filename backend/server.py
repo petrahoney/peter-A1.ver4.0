@@ -17,7 +17,7 @@ import asyncio
 import os
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, AsyncIterator, Optional
 
 from dotenv import load_dotenv
@@ -498,6 +498,97 @@ async def stats(workspace_id: Optional[str] = None) -> dict[str, Any]:
         "recent": recent,
         "tier_catalog": TIER_CATALOG,
         "workspace_id": workspace_id,
+    }
+
+
+# ───────────────────────── Sparkline ─────────────────────────
+
+
+@app.get("/api/stats/sparkline")
+async def stats_sparkline(
+    workspace_id: Optional[str] = None, days: int = 7
+) -> dict[str, Any]:
+    """Per-tier daily series for the last N days (default 7), workspace-aware.
+
+    Returns one bucket per (tier, day) with count, cost_usd, saved_usd.
+    Days with no activity are zero-filled so the sparkline renders cleanly.
+    """
+    days = max(1, min(days, 90))
+    now = datetime.now(timezone.utc)
+    today = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+    # bucket boundaries (UTC midnight)
+    day_keys = []
+    for i in range(days - 1, -1, -1):
+        d = today - timedelta(days=i)
+        day_keys.append(d.strftime("%Y-%m-%d"))
+    start_iso = (today - timedelta(days=days - 1)).isoformat()
+
+    match_stage: dict[str, Any] = {
+        "role": "assistant",
+        "created_at": {"$gte": start_iso},
+    }
+    if workspace_id:
+        ws_query: dict[str, Any] = {}
+        if workspace_id == "__none__":
+            ws_query["workspace_id"] = {"$in": [None, ""]}
+        else:
+            ws_query["workspace_id"] = workspace_id
+        session_ids = [s["_id"] async for s in db.sessions.find(ws_query, {"_id": 1})]
+        match_stage["session_id"] = {"$in": session_ids}
+
+    pipeline = [
+        {"$match": match_stage},
+        {
+            "$group": {
+                "_id": {
+                    "tier": "$tier",
+                    "day": {"$substr": ["$created_at", 0, 10]},
+                },
+                "count": {"$sum": 1},
+                "cost": {"$sum": "$cost_usd"},
+                "saved": {"$sum": "$saved_usd"},
+            }
+        },
+    ]
+
+    by_tier: dict[str, dict[str, dict[str, float]]] = {}
+    async for row in db.messages.aggregate(pipeline):
+        tier = row["_id"]["tier"] or "unknown"
+        day = row["_id"]["day"]
+        by_tier.setdefault(tier, {})[day] = {
+            "count": row["count"],
+            "cost_usd": round(row["cost"] or 0.0, 6),
+            "saved_usd": round(row["saved"] or 0.0, 6),
+        }
+
+    series: dict[str, list[dict[str, Any]]] = {}
+    for tier in TIER_CATALOG.keys():
+        rows = by_tier.get(tier, {})
+        series[tier] = [
+            {
+                "date": dk,
+                "count": rows.get(dk, {}).get("count", 0),
+                "cost_usd": rows.get(dk, {}).get("cost_usd", 0.0),
+                "saved_usd": rows.get(dk, {}).get("saved_usd", 0.0),
+            }
+            for dk in day_keys
+        ]
+
+    totals_by_tier = {
+        tier: {
+            "count": sum(p["count"] for p in pts),
+            "cost_usd": round(sum(p["cost_usd"] for p in pts), 6),
+            "saved_usd": round(sum(p["saved_usd"] for p in pts), 6),
+        }
+        for tier, pts in series.items()
+    }
+
+    return {
+        "workspace_id": workspace_id,
+        "days": days,
+        "day_keys": day_keys,
+        "series": series,
+        "totals_by_tier": totals_by_tier,
     }
 
 

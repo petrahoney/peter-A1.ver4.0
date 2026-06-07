@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import {
   PaperPlaneRight,
   Sparkle,
@@ -203,6 +204,7 @@ function MessageBubble({ m, streaming }) {
 }
 
 function SessionItem({ s, active, onSelect, onRename, onDelete }) {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(s.title || "Untitled");
   const [menu, setMenu] = useState(null); // {x, y} when right-click menu is open
@@ -325,7 +327,7 @@ function SessionItem({ s, active, onSelect, onRename, onDelete }) {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                if (window.confirm(`Delete "${s.title || "this session"}"?`))
+                if (window.confirm(t("chat.confirmDelete", { title: s.title || "this session" })))
                   onDelete(s.id);
               }}
               className="text-peter-dim hover:text-red-400 p-1"
@@ -354,7 +356,7 @@ function SessionItem({ s, active, onSelect, onRename, onDelete }) {
             }}
           >
             <PencilSimple size={12} weight="regular" />
-            Rename
+            {t("chat.rename")}
           </button>
           <div className="divider" />
           <button
@@ -363,12 +365,12 @@ function SessionItem({ s, active, onSelect, onRename, onDelete }) {
             data-testid={`session-context-delete-${s.id}`}
             onClick={() => {
               closeMenu();
-              if (window.confirm(`Delete "${s.title || "this session"}"?`))
+              if (window.confirm(t("chat.confirmDelete", { title: s.title || "this session" })))
                 onDelete(s.id);
             }}
           >
             <Trash size={12} weight="regular" />
-            Delete
+            {t("chat.delete")}
           </button>
         </div>
       ) : null}
@@ -378,6 +380,7 @@ function SessionItem({ s, active, onSelect, onRename, onDelete }) {
 
 export default function ChatView() {
   const { active, activeId } = useWorkspace();
+  const { t } = useTranslation();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sessionId, setSessionId] = useState(null);
@@ -638,21 +641,21 @@ export default function ChatView() {
       >
         <div className="px-4 pt-6 pb-3 flex items-center justify-between">
           <div className="text-[10px] tracking-[0.3em] uppercase text-peter-dim">
-            Sessions
+            {t("sidebar.sessions")}
           </div>
           <button
             onClick={newSession}
             data-testid="new-session-btn"
             className="text-peter-gold hover:text-peter-goldLight p-1 inline-flex items-center gap-1 text-[10px] tracking-widest uppercase"
           >
-            <Plus size={12} weight="bold" /> New
+            <Plus size={12} weight="bold" /> {t("sidebar.new")}
           </button>
         </div>
         <div className="hairline mx-3" />
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {sessions.length === 0 ? (
             <div className="px-3 py-4 text-xs text-peter-dim/70 italic">
-              No sessions yet. Begin a conversation to create one.
+              {t("sidebar.noSessions")}
             </div>
           ) : (
             sessions.map((s) => (
@@ -673,11 +676,11 @@ export default function ChatView() {
       <div className="flex-1 flex flex-col">
         <header className="px-12 pt-10 pb-6 border-b border-peter-gold/10">
           <div className="text-[11px] tracking-[0.32em] uppercase text-peter-dim">
-            Conversation
+            {t("chat.label")}
           </div>
           <div className="flex items-end justify-between gap-6 mt-1">
             <h1 className="h-display text-4xl text-peter-ivory">
-              A <em className="text-peter-gold not-italic">private</em> council
+              {t("chat.title")}
             </h1>
             <div className="flex items-center gap-3 flex-wrap justify-end">
             {active ? (
@@ -694,7 +697,7 @@ export default function ChatView() {
             <button
               onClick={toggleMemory}
               data-testid="memory-toggle"
-              title={memoryEnabled ? "Memory ON — recall + storage active" : "Memory OFF — no recall, no storage"}
+              title={memoryEnabled ? t("chat.memoryOn") : t("chat.memoryOff")}
               className={[
                 "inline-flex items-center gap-1.5 px-3 py-2 rounded-md border text-[10px] tracking-widest uppercase transition-colors",
                 memoryEnabled
@@ -703,10 +706,10 @@ export default function ChatView() {
               ].join(" ")}
             >
               {memoryEnabled ? <Brain size={12} weight="fill" /> : <Prohibit size={12} weight="bold" />}
-              {memoryEnabled ? "Memory ON" : "Memory OFF"}
+              {memoryEnabled ? t("chat.memoryOn") : t("chat.memoryOff")}
             </button>
             <span className="text-[10px] tracking-[0.32em] uppercase text-peter-dim">
-              Force tier
+              {t("chat.forceTier")}
             </span>
             <select
               data-testid="force-tier-select"
@@ -714,10 +717,10 @@ export default function ChatView() {
               onChange={(e) => onForceTierChange(e.target.value)}
               className="bg-peter-navy2 border border-peter-gold/30 text-peter-ivory text-xs px-3 py-2 rounded-md font-mono"
             >
-                <option value="">Auto</option>
-                {Object.values(tierCatalog).map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.label} — {t.name}
+                <option value="">{t("chat.auto")}</option>
+                {Object.values(tierCatalog).map((tier) => (
+                  <option key={tier.id} value={tier.id}>
+                    {tier.label} — {tier.name}
                   </option>
                 ))}
               </select>
@@ -734,17 +737,16 @@ export default function ChatView() {
             <div className="h-full flex flex-col items-center justify-center text-center">
               <Sparkle size={28} weight="light" className="text-peter-gold/70" />
               <div className="h-display text-3xl text-peter-ivory mt-4">
-                How may I assist?
+                {t("chat.howMayIAssist")}
               </div>
               <div className="text-sm text-peter-dim mt-2 max-w-md leading-relaxed">
-                Ask anything — a calculation, a definition, a deep strategy review.
-                PETER picks the right model in milliseconds.
+                {t("chat.subtitle")}
               </div>
               <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-2 max-w-2xl w-full">
                 {[
-                  "What time is it in Tokyo?",
-                  "Analyze the strategic risk of expanding to Europe in 2026.",
-                  "Define the difference between OOP and FP.",
+                  t("chat.suggest1"),
+                  t("chat.suggest2"),
+                  t("chat.suggest3"),
                 ].map((s) => (
                   <button
                     key={s}
@@ -778,7 +780,7 @@ export default function ChatView() {
               data-testid="queue-indicator"
               className="mb-2 text-[10px] tracking-[0.3em] uppercase text-peter-gold/80"
             >
-              {queuedCount} message{queuedCount === 1 ? "" : "s"} queued
+              {t("chat.queued", { count: queuedCount })}
             </div>
           ) : null}
           <div className="flex gap-3 items-end">
@@ -786,11 +788,7 @@ export default function ChatView() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKey}
-              placeholder={
-                streaming
-                  ? "Continue composing — your next turn will queue…"
-                  : "Speak with PETER…"
-              }
+              placeholder={t("chat.placeholder")}
               rows={2}
               data-testid="chat-input"
               className="flex-1 bg-peter-navy2 border border-peter-gold/20 focus:border-peter-gold/60 focus:outline-none px-4 py-3 rounded-md resize-none font-light placeholder:text-peter-dim/60 transition-colors"
@@ -802,7 +800,7 @@ export default function ChatView() {
                 data-testid="chat-stop"
                 className="bg-peter-navy2 text-peter-gold border border-peter-gold/60 hover:bg-peter-gold/10 transition-colors px-4 py-3 rounded-md font-medium inline-flex items-center gap-2"
               >
-                <Stop size={16} weight="fill" /> Stop
+                <Stop size={16} weight="fill" /> {t("chat.stop")}
               </button>
             ) : null}
             <button
@@ -812,7 +810,7 @@ export default function ChatView() {
               className="bg-peter-gold disabled:opacity-40 text-peter-black hover:bg-peter-goldLight transition-colors px-5 py-3 rounded-md font-medium inline-flex items-center gap-2"
             >
               <PaperPlaneRight size={16} weight="fill" />
-              {streaming ? "Queue" : "Send"}
+              {t("chat.send")}
             </button>
           </div>
         </div>

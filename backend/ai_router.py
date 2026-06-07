@@ -163,7 +163,10 @@ class AIRouter:
                     "Respond with calm authority, depth, and elegance. "
                     "Be concise but substantive. Avoid filler like "
                     '"Certainly!" or "Of course!". '
-                    "Reply in the same language the user used."
+                    "Always detect the user's language from their message and "
+                    "reply fluently in that exact language (English, Bahasa "
+                    "Indonesia, 中文, Español, العربية, or any other). "
+                    "Match script and tone precisely; never translate unless asked."
                 ),
             ).with_model(meta["provider"], meta["preview_model"])
             self._sessions[key] = chat

@@ -1,0 +1,76 @@
+{
+  "nav": {
+    "command": "Comando",
+    "chat": "Chat",
+    "router": "Enrutador",
+    "crew": "Constructor",
+    "memory": "Memoria",
+    "workspaces": "Espacios",
+    "cost": "Coste",
+    "settings": "Ajustes"
+  },
+  "sidebar": {
+    "sessions": "Sesiones",
+    "new": "Nueva",
+    "noSessions": "Sin sesiones aún. Inicia una conversación para crear una.",
+    "allWorkspaces": "Todos los espacios",
+    "manageWorkspaces": "Gestionar espacios",
+    "footerBrand": "PETER AI v4.0 — Intelligence, Elevated. Built in Indonesia.",
+    "language": "Idioma"
+  },
+  "chat": {
+    "title": "Un consejo privado",
+    "label": "Conversación",
+    "placeholder": "Habla con PETER…",
+    "send": "Enviar",
+    "stop": "Detener",
+    "queued": "{{count}} mensaje en cola",
+    "queued_plural": "{{count}} mensajes en cola",
+    "memoryOn": "Memoria Activa",
+    "memoryOff": "Memoria Inactiva",
+    "forceTier": "Forzar Nivel",
+    "auto": "Auto",
+    "howMayIAssist": "¿En qué puedo ayudarle?",
+    "subtitle": "Pregunte cualquier cosa — un cálculo, una definición, una revisión estratégica profunda. PETER elige el modelo correcto en milisegundos.",
+    "suggest1": "¿Qué hora es en Tokio?",
+    "suggest2": "Analiza el riesgo estratégico de expandirse a Europa en 2026.",
+    "suggest3": "Define la diferencia entre OOP y FP.",
+    "rename": "Renombrar",
+    "delete": "Eliminar",
+    "confirmDelete": "¿Eliminar \"{{title}}\"?"
+  },
+  "cost": {
+    "label": "Coste y Uso",
+    "title": "El libro de",
+    "titleAccent": "ahorros",
+    "totalQueries": "Consultas Totales",
+    "totalCost": "Coste Total",
+    "savedVsPremium": "Ahorrado vs Premium",
+    "avgLatency": "Latencia Media",
+    "lifetime": "Acumulado",
+    "acrossAllTiers": "En todos los niveles",
+    "ifPremium": "Si cada consulta se ejecutara en Claude Opus",
+    "meanAcrossTiers": "Media entre niveles",
+    "distributionByTier": "Distribución por nivel",
+    "spendVsSavings": "Gasto vs ahorro por nivel",
+    "recentQueries": "Consultas recientes",
+    "noQueriesYet": "Sin consultas aún. Visita el chat para comenzar.",
+    "scope": "Ámbito",
+    "sparkline": "Ahorro — últimos 7 días",
+    "sparklineHint": "Pequeñas líneas doradas por nivel. Sigue el espacio activo.",
+    "noActivity": "Sin actividad aún."
+  },
+  "settings": {
+    "label": "Ajustes",
+    "title": "Afina al estratega",
+    "aboutTitle": "Acerca de PETER",
+    "languageTitle": "Idioma de la interfaz",
+    "languageHint": "Traduce la interfaz. PETER detecta automáticamente el idioma que usa en el chat y responde en el mismo."
+  },
+  "common": {
+    "loading": "Cargando…",
+    "close": "Cerrar",
+    "save": "Guardar",
+    "cancel": "Cancelar"
+  }
+}

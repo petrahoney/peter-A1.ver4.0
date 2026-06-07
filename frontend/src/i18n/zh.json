@@ -1,0 +1,76 @@
+{
+  "nav": {
+    "command": "指挥中心",
+    "chat": "对话",
+    "router": "路由器",
+    "crew": "团队构建",
+    "memory": "记忆",
+    "workspaces": "工作区",
+    "cost": "成本",
+    "settings": "设置"
+  },
+  "sidebar": {
+    "sessions": "会话",
+    "new": "新建",
+    "noSessions": "暂无会话。开始对话以创建。",
+    "allWorkspaces": "所有工作区",
+    "manageWorkspaces": "管理工作区",
+    "footerBrand": "PETER AI v4.0 — Intelligence, Elevated. Built in Indonesia.",
+    "language": "语言"
+  },
+  "chat": {
+    "title": "私人议会",
+    "label": "对话",
+    "placeholder": "与 PETER 对话…",
+    "send": "发送",
+    "stop": "停止",
+    "queued": "{{count}} 条消息排队中",
+    "queued_plural": "{{count}} 条消息排队中",
+    "memoryOn": "记忆开启",
+    "memoryOff": "记忆关闭",
+    "forceTier": "强制层级",
+    "auto": "自动",
+    "howMayIAssist": "需要什么协助?",
+    "subtitle": "尽管发问 — 计算、定义、深度战略评估。PETER 在毫秒内选择最合适的模型。",
+    "suggest1": "东京现在几点?",
+    "suggest2": "分析 2026 年扩展到欧洲的战略风险。",
+    "suggest3": "解释面向对象编程与函数式编程的区别。",
+    "rename": "重命名",
+    "delete": "删除",
+    "confirmDelete": "删除「{{title}}」?"
+  },
+  "cost": {
+    "label": "成本与用量",
+    "title": "节省",
+    "titleAccent": "账本",
+    "totalQueries": "总查询数",
+    "totalCost": "总成本",
+    "savedVsPremium": "对比 Premium 节省",
+    "avgLatency": "平均延迟",
+    "lifetime": "累计",
+    "acrossAllTiers": "全部层级",
+    "ifPremium": "如果所有查询都使用 Claude Opus",
+    "meanAcrossTiers": "层级平均",
+    "distributionByTier": "按层级分布",
+    "spendVsSavings": "各层级支出与节省",
+    "recentQueries": "最近查询",
+    "noQueriesYet": "暂无查询。前往对话开始。",
+    "scope": "范围",
+    "sparkline": "节省 — 最近 7 天",
+    "sparklineHint": "每个层级一条金色细线。跟随当前工作区。",
+    "noActivity": "暂无活动。"
+  },
+  "settings": {
+    "label": "设置",
+    "title": "调校策略师",
+    "aboutTitle": "关于 PETER",
+    "languageTitle": "界面语言",
+    "languageHint": "翻译界面。PETER 会自动识别您在对话中使用的语言并以相同语言回复。"
+  },
+  "common": {
+    "loading": "加载中…",
+    "close": "关闭",
+    "save": "保存",
+    "cancel": "取消"
+  }
+}

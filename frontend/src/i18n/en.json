@@ -1,0 +1,76 @@
+{
+  "nav": {
+    "command": "Command",
+    "chat": "Chat",
+    "router": "Router",
+    "crew": "Crew Builder",
+    "memory": "Memory",
+    "workspaces": "Workspaces",
+    "cost": "Cost",
+    "settings": "Settings"
+  },
+  "sidebar": {
+    "sessions": "Sessions",
+    "new": "New",
+    "noSessions": "No sessions yet. Begin a conversation to create one.",
+    "allWorkspaces": "All workspaces",
+    "manageWorkspaces": "Manage workspaces",
+    "footerBrand": "PETER AI v4.0 — Intelligence, Elevated. Built in Indonesia.",
+    "language": "Language"
+  },
+  "chat": {
+    "title": "A private council",
+    "label": "Conversation",
+    "placeholder": "Speak with PETER…",
+    "send": "Send",
+    "stop": "Stop",
+    "queued": "{{count}} message queued",
+    "queued_plural": "{{count}} messages queued",
+    "memoryOn": "Memory On",
+    "memoryOff": "Memory Off",
+    "forceTier": "Force Tier",
+    "auto": "Auto",
+    "howMayIAssist": "How may I assist?",
+    "subtitle": "Ask anything — a calculation, a definition, a deep strategy review. PETER picks the right model in milliseconds.",
+    "suggest1": "What time is it in Tokyo?",
+    "suggest2": "Analyze the strategic risk of expanding to Europe in 2026.",
+    "suggest3": "Define the difference between OOP and FP.",
+    "rename": "Rename",
+    "delete": "Delete",
+    "confirmDelete": "Delete \"{{title}}\"?"
+  },
+  "cost": {
+    "label": "Cost & Usage",
+    "title": "The savings",
+    "titleAccent": "ledger",
+    "totalQueries": "Total Queries",
+    "totalCost": "Total Cost",
+    "savedVsPremium": "Saved vs Premium",
+    "avgLatency": "Avg Latency",
+    "lifetime": "Lifetime",
+    "acrossAllTiers": "Across all tiers",
+    "ifPremium": "If we'd run every query on Claude Opus",
+    "meanAcrossTiers": "Mean across tiers",
+    "distributionByTier": "Distribution by tier",
+    "spendVsSavings": "Spend vs savings per tier",
+    "recentQueries": "Recent queries",
+    "noQueriesYet": "No queries yet. Visit the chat to begin.",
+    "scope": "Scope",
+    "sparkline": "Savings — last 7 days",
+    "sparklineHint": "Tiny gold lines per tier. Workspace-aware.",
+    "noActivity": "No activity yet."
+  },
+  "settings": {
+    "label": "Settings",
+    "title": "Tune the strategist",
+    "aboutTitle": "About PETER",
+    "languageTitle": "Interface language",
+    "languageHint": "Translates the UI. PETER auto-detects the language you use in chat and replies in kind."
+  },
+  "common": {
+    "loading": "Loading…",
+    "close": "Close",
+    "save": "Save",
+    "cancel": "Cancel"
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "nav": {
+    "command": "Komando",
+    "chat": "Obrolan",
+    "router": "Router",
+    "crew": "Pembangun Tim",
+    "memory": "Memori",
+    "workspaces": "Ruang Kerja",
+    "cost": "Biaya",
+    "settings": "Pengaturan"
+  },
+  "sidebar": {
+    "sessions": "Sesi",
+    "new": "Baru",
+    "noSessions": "Belum ada sesi. Mulai percakapan untuk membuatnya.",
+    "allWorkspaces": "Semua ruang kerja",
+    "manageWorkspaces": "Kelola ruang kerja",
+    "footerBrand": "PETER AI v4.0 — Intelligence, Elevated. Built in Indonesia.",
+    "language": "Bahasa"
+  },
+  "chat": {
+    "title": "Dewan pribadi",
+    "label": "Percakapan",
+    "placeholder": "Berbicara dengan PETER…",
+    "send": "Kirim",
+    "stop": "Hentikan",
+    "queued": "{{count}} pesan dalam antrean",
+    "queued_plural": "{{count}} pesan dalam antrean",
+    "memoryOn": "Memori Aktif",
+    "memoryOff": "Memori Nonaktif",
+    "forceTier": "Paksa Tingkat",
+    "auto": "Otomatis",
+    "howMayIAssist": "Apa yang bisa saya bantu?",
+    "subtitle": "Tanyakan apa saja — perhitungan, definisi, ulasan strategi mendalam. PETER memilih model yang tepat dalam milidetik.",
+    "suggest1": "Jam berapa di Tokyo?",
+    "suggest2": "Analisis risiko strategis ekspansi ke Eropa pada 2026.",
+    "suggest3": "Jelaskan perbedaan OOP dan FP.",
+    "rename": "Ganti Nama",
+    "delete": "Hapus",
+    "confirmDelete": "Hapus \"{{title}}\"?"
+  },
+  "cost": {
+    "label": "Biaya & Penggunaan",
+    "title": "Buku besar",
+    "titleAccent": "penghematan",
+    "totalQueries": "Total Kueri",
+    "totalCost": "Total Biaya",
+    "savedVsPremium": "Hemat vs Premium",
+    "avgLatency": "Rata-rata Latensi",
+    "lifetime": "Sepanjang Masa",
+    "acrossAllTiers": "Di semua tingkat",
+    "ifPremium": "Jika setiap kueri dijalankan di Claude Opus",
+    "meanAcrossTiers": "Rata-rata semua tingkat",
+    "distributionByTier": "Distribusi per tingkat",
+    "spendVsSavings": "Belanja vs penghematan per tingkat",
+    "recentQueries": "Kueri terbaru",
+    "noQueriesYet": "Belum ada kueri. Buka obrolan untuk memulai.",
+    "scope": "Lingkup",
+    "sparkline": "Penghematan — 7 hari terakhir",
+    "sparklineHint": "Garis emas mungil per tingkat. Mengikuti ruang kerja aktif.",
+    "noActivity": "Belum ada aktivitas."
+  },
+  "settings": {
+    "label": "Pengaturan",
+    "title": "Setel sang ahli strategi",
+    "aboutTitle": "Tentang PETER",
+    "languageTitle": "Bahasa antarmuka",
+    "languageHint": "Menerjemahkan UI. PETER mendeteksi bahasa yang Anda gunakan dalam obrolan dan membalas dalam bahasa yang sama."
+  },
+  "common": {
+    "loading": "Memuat…",
+    "close": "Tutup",
+    "save": "Simpan",
+    "cancel": "Batal"
+  }
+}

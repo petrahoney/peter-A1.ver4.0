@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { BrowserRouter, Routes, Route, NavLink, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import {
   ChatCircleDots,
   Graph,
@@ -22,25 +23,27 @@ import CostView from "./views/CostView";
 import MemoryView from "./views/MemoryView";
 import SettingsView from "./views/SettingsView";
 import WorkspacesView from "./views/WorkspacesView";
+import LanguageSwitcher from "./components/LanguageSwitcher";
 
 import { WorkspaceProvider, useWorkspace } from "./context/WorkspaceContext";
 import { Link as RLink } from "react-router-dom";
 
 import "./App.css";
 
-const NAV = [
-  { to: "/", label: "Command", icon: Sparkle, exact: true, testid: "nav-command" },
-  { to: "/chat", label: "Chat", icon: ChatCircleDots, testid: "nav-chat" },
-  { to: "/router", label: "Router", icon: Graph, testid: "nav-router" },
-  { to: "/crew", label: "Crew Builder", icon: UsersThree, testid: "nav-crew" },
-  { to: "/memory", label: "Memory", icon: Brain, testid: "nav-memory" },
-  { to: "/workspaces", label: "Workspaces", icon: Stack, testid: "nav-workspaces" },
-  { to: "/cost", label: "Cost", icon: ChartLineUp, testid: "nav-cost" },
-  { to: "/settings", label: "Settings", icon: GearSix, testid: "nav-settings" },
+const NAV_ITEMS = [
+  { to: "/", key: "command", icon: Sparkle, exact: true, testid: "nav-command" },
+  { to: "/chat", key: "chat", icon: ChatCircleDots, testid: "nav-chat" },
+  { to: "/router", key: "router", icon: Graph, testid: "nav-router" },
+  { to: "/crew", key: "crew", icon: UsersThree, testid: "nav-crew" },
+  { to: "/memory", key: "memory", icon: Brain, testid: "nav-memory" },
+  { to: "/workspaces", key: "workspaces", icon: Stack, testid: "nav-workspaces" },
+  { to: "/cost", key: "cost", icon: ChartLineUp, testid: "nav-cost" },
+  { to: "/settings", key: "settings", icon: GearSix, testid: "nav-settings" },
 ];
 
 function WorkspaceSelector() {
   const { workspaces, active, setActive } = useWorkspace();
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   return (
     <div className="relative" data-testid="workspace-selector">
@@ -55,7 +58,7 @@ function WorkspaceSelector() {
             style={{ backgroundColor: active ? active.color : "rgba(201,168,76,0.25)" }}
           />
           <span className="text-[12px] text-peter-ivory truncate font-light">
-            {active ? active.name : "All workspaces"}
+            {active ? active.name : t("sidebar.allWorkspaces")}
           </span>
         </div>
         <CaretDown size={12} weight="bold" className="text-peter-dim" />
@@ -76,7 +79,7 @@ function WorkspaceSelector() {
             }`}
           >
             <span className="inline-block w-1.5 h-1.5 rounded-full mr-2 align-middle" style={{ background: "rgba(201,168,76,0.25)" }} />
-            All workspaces
+            {t("sidebar.allWorkspaces")}
           </button>
           {workspaces.map((w) => (
             <button
@@ -103,7 +106,7 @@ function WorkspaceSelector() {
             className="block px-3 py-2 text-[11px] text-peter-gold border-t border-peter-gold/15 hover:bg-peter-gold/10 transition-colors"
           >
             <Plus size={11} weight="bold" className="inline-block mr-1" />
-            Manage workspaces
+            {t("sidebar.manageWorkspaces")}
           </RLink>
         </div>
       ) : null}
@@ -112,6 +115,7 @@ function WorkspaceSelector() {
 }
 
 function Sidebar() {
+  const { t } = useTranslation();
   return (
     <aside
       className="fixed left-0 top-0 h-screen w-64 glass-strong z-40 flex flex-col"
@@ -137,7 +141,7 @@ function Sidebar() {
       <div className="px-7"><div className="hairline" /></div>
 
       <nav className="flex-1 px-4 mt-2 space-y-1 overflow-y-auto">
-        {NAV.map((item) => (
+        {NAV_ITEMS.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -153,16 +157,21 @@ function Sidebar() {
             }
           >
             <item.icon size={18} weight="light" />
-            <span className="text-sm tracking-wide">{item.label}</span>
+            <span className="text-sm tracking-wide">{t(`nav.${item.key}`)}</span>
           </NavLink>
         ))}
       </nav>
+
+      <div className="px-4 pb-3">
+        <LanguageSwitcher variant="sidebar" />
+      </div>
 
       <div className="px-7 pb-7">
         <div className="hairline mb-4" />
         <div
           data-testid="sidebar-footer-brand"
           className="text-[10px] tracking-[0.22em] text-peter-dim/80 font-light leading-snug"
+          dir="ltr"
         >
           PETER AI v4.0 — <span className="text-peter-gold">Intelligence, Elevated.</span> Built in Indonesia.
         </div>
