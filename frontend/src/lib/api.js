@@ -60,6 +60,9 @@ export const setSessionMemoryEnabled = (session_id, memory_enabled) =>
 export const setSessionWorkspace = (session_id, workspace_id) =>
   api.patch(`/sessions/${session_id}`, { workspace_id: workspace_id || "" }).then((r) => r.data);
 
+export const setSessionReplyLang = (session_id, reply_lang) =>
+  api.patch(`/sessions/${session_id}`, { reply_lang: reply_lang || "" }).then((r) => r.data);
+
 export const listWorkspaces = () =>
   api.get("/workspaces").then((r) => r.data);
 

@@ -40,7 +40,12 @@
     "confirmDelete": "Hapus \"{{title}}\"?",
     "didYouMean": "Sepertinya Anda menulis dalam {{lang}} — ganti UI?",
     "switchUi": "Ganti",
-    "keepUi": "Biarkan"
+    "keepUi": "Biarkan",
+    "threadLang": "Percakapan ini dalam {{lang}}.",
+    "replyIn": "Balas dalam {{lang}}",
+    "replyLangActive": "Balasan dipaksa dalam {{lang}}",
+    "replyLangClear": "Hapus",
+    "translatorHint": "Buka dalam bahasa UI Anda saat ini."
   },
   "cost": {
     "label": "Biaya & Penggunaan",

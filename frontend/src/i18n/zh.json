@@ -40,7 +40,12 @@
     "confirmDelete": "删除「{{title}}」?",
     "didYouMean": "您似乎在用{{lang}}书写 — 切换界面语言?",
     "switchUi": "切换",
-    "keepUi": "保留"
+    "keepUi": "保留",
+    "threadLang": "此对话使用{{lang}}。",
+    "replyIn": "用{{lang}}回复",
+    "replyLangActive": "已强制使用{{lang}}回复",
+    "replyLangClear": "清除",
+    "translatorHint": "用当前界面语言打开。"
   },
   "cost": {
     "label": "成本与用量",

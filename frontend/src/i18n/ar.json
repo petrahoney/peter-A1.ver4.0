@@ -40,7 +40,12 @@
     "confirmDelete": "حذف «{{title}}»؟",
     "didYouMean": "يبدو أنّك تكتب بـ{{lang}} — هل تبدّل لغة الواجهة؟",
     "switchUi": "تبديل",
-    "keepUi": "إبقاء"
+    "keepUi": "إبقاء",
+    "threadLang": "هذه المحادثة بـ{{lang}}.",
+    "replyIn": "ردّ بـ{{lang}}",
+    "replyLangActive": "الردود مفروضة بـ{{lang}}",
+    "replyLangClear": "إلغاء",
+    "translatorHint": "افتح بلغة الواجهة الحالية."
   },
   "cost": {
     "label": "التكلفة والاستخدام",

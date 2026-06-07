@@ -40,7 +40,12 @@
     "confirmDelete": "Delete \"{{title}}\"?",
     "didYouMean": "Looks like you're writing in {{lang}} — switch the UI?",
     "switchUi": "Switch",
-    "keepUi": "Keep"
+    "keepUi": "Keep",
+    "threadLang": "This thread is in {{lang}}.",
+    "replyIn": "Reply in {{lang}}",
+    "replyLangActive": "Replies forced to {{lang}}",
+    "replyLangClear": "Clear",
+    "translatorHint": "Open in your current UI language."
   },
   "cost": {
     "label": "Cost & Usage",

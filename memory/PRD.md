@@ -27,7 +27,27 @@ Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi
 | SMART     | Claude Sonnet 4.5          | claude-sonnet-4-5-20250929    | anthropic  | 0.0150 |
 | CRITICAL  | Claude Opus 4.5            | claude-opus-4-5-20251101      | anthropic  | 0.1500 |
 
-## Implemented (v4.2 · 8-Jun-2026 — "Did you mean…?" Language Drift Hint)
+## Implemented (v4.3 · 8-Jun-2026 — Floating Session Translator)
+
+### Backend
+- ✅ New `reply_lang` Optional[str] on the session schema; accepted via PATCH `/api/sessions/{id}` (values: `en|id|zh|es|ar`, `""` clears). Echoed by GET sessions list + GET messages.
+- ✅ New helper `apply_reply_lang(message, reply_lang)` softly appends `[User preference for THIS thread: please reply in <Lang>, even when my message is in another language. This overrides the default mirror-the-input-language behaviour for this conversation only.]` to the user's message before routing. Used by both `/api/chat` and `/api/chat/stream`.
+
+### Frontend
+- ✅ `SessionItem` now runs the same `detectLang` heuristic against the session title. When detected ≠ UI locale, a small gold `Globe` button (Phosphor) renders in the row.
+- ✅ Click opens an inline popover ([data-testid="session-translator-popover-{id}"]):
+  - Line 1: localised `chat.threadLang` — "This thread is in {{native}}."
+  - Line 2: `chat.translatorHint` — "Open in your current UI language."
+  - Gold action button: localised `chat.replyIn` — "Reply in {{ui_native}}".
+- ✅ Action triggers `setSessionReplyLang(id, uiLang)` + `loadSession(id)`. A new compact `🌐 EN` badge appears on the session row whenever `reply_lang` is set ([data-testid="session-reply-lang-badge-{id}"]).
+- ✅ Popover closes on outside click + Escape; RTL-aware via `dir={uiMeta.dir}`.
+- ✅ Translations for 6 new keys (`threadLang`, `replyIn`, `replyLangActive`, `replyLangClear`, `translatorHint`) shipped in all 5 locales.
+
+### Verified
+- `PATCH /api/sessions/{id} {"reply_lang":"en"}` ↦ Spanish-input request to `/api/chat` returns an English strategist reply (`"The risk in LATAM is structural…"`). Confirmed via cURL.
+- UI: globe button appears on the Chinese-titled session under English UI; popover renders correctly; gold reply-lang `EN` badge persists across sidebar refresh.
+
+
 
 ### Detection
 - ✅ New `/app/frontend/src/lib/detectLang.js` — zero-dep heuristic detector for the 5 supported locales:
@@ -108,6 +128,12 @@ Five prompts in user message #347 audited and closed.
 ### Integration test (Prompt 5)
 - TTFT **22 ms** (target < 500 ms)
 - Stats badge, sidebar (11 sessions), Workspaces (2 cards), Memory List/Graph, Export, Memory toggle — all green.
+
+## Implemented (v4.2 · 8-Jun-2026 — "Did you mean…?" Language Drift Hint)
+- ✅ Zero-dep client-side detector `/app/frontend/src/lib/detectLang.js` — Unicode script ranges + stoplist scoring for 5 locales.
+- ✅ Gold hairline pill above `/chat` input ([data-testid="lang-mismatch-hint"]) when typed text language ≠ UI language. One-tap Switch / per-language dismiss.
+- ✅ Translations for `chat.didYouMean / switchUi / keepUi` in EN / ID / ZH / ES / AR.
+
 
 ## Implemented (v4.1 · 8-Jun-2026 — Sparklines + Multi-Language)
 
@@ -255,5 +281,5 @@ Four cohesive additions; PETER is now a **portfolio of private councils**.
 - ✅ HTML `<meta description>` + OG tags + FastAPI app title updated.
 
 ## Next Action Items
-- Iteration 4 closed ("Did you mean…?" hint). Ready for user verification: type a non-UI-language prompt in `/chat`, watch the gold pill appear, one-tap switch.
-- P2 backlog: translate body copy of Home / Router / Crew / Memory / Workspaces; per-session system-prompt versioning; WorkspaceSelector outside-click close; React Router v7 future flags.
+- Iteration 5 closed (Floating Session Translator). Try it: switch UI to English → notice 🌐 icon on the Chinese / Spanish session rows → click → tap "Reply in English".
+- P2 backlog: translate Home / Router / Crew / Memory / Workspaces body copy; per-session system-prompt versioning; WorkspaceSelector outside-click close; React Router v7 future flags; "Clear reply_lang" UX on the badge itself (currently only via PATCH `reply_lang=""`).

@@ -11,6 +11,7 @@ import {
   Stop,
   Brain,
   Prohibit,
+  Globe,
 } from "@phosphor-icons/react";
 import { motion } from "framer-motion";
 import {
@@ -21,6 +22,7 @@ import {
   deleteSession,
   setSessionTier,
   setSessionMemoryEnabled,
+  setSessionReplyLang,
 } from "../lib/api";
 import Markdown from "../components/Markdown";
 import useStreamingChat from "../hooks/useStreamingChat";
@@ -205,11 +207,23 @@ function MessageBubble({ m, streaming }) {
   );
 }
 
-function SessionItem({ s, active, onSelect, onRename, onDelete }) {
+function SessionItem({ s, active, onSelect, onRename, onDelete, onApplyReplyLang, uiLang }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(s.title || "Untitled");
   const [menu, setMenu] = useState(null); // {x, y} when right-click menu is open
+  const [translatorOpen, setTranslatorOpen] = useState(false);
+
+  // Detect the session's dominant language from its title (which is the first
+  // user message truncated). Cheap, fully client-side.
+  const detected = useMemo(() => detectLang(s.title || ""), [s.title]);
+  const showGlobe =
+    !!detected && detected !== uiLang && !s.reply_lang;
+  const detectedMeta = detected ? LANGUAGES.find((l) => l.code === detected) : null;
+  const uiMeta = LANGUAGES.find((l) => l.code === uiLang) || LANGUAGES[0];
+  const replyLangMeta = s.reply_lang
+    ? LANGUAGES.find((l) => l.code === s.reply_lang)
+    : null;
 
   const commit = async () => {
     const t = title.trim();
@@ -244,6 +258,22 @@ function SessionItem({ s, active, onSelect, onRename, onDelete }) {
       window.removeEventListener("keydown", onKey);
     };
   }, [menu]);
+
+  useEffect(() => {
+    if (!translatorOpen) return undefined;
+    const onDown = (e) => {
+      // close when clicking anywhere outside this item
+      if (!e.target.closest(`[data-testid="session-item-${s.id}"]`))
+        setTranslatorOpen(false);
+    };
+    const onKey = (e) => e.key === "Escape" && setTranslatorOpen(false);
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [translatorOpen, s.id]);
 
   return (
     <div
@@ -311,10 +341,34 @@ function SessionItem({ s, active, onSelect, onRename, onDelete }) {
             <div className="text-xs text-peter-ivory truncate font-light">
               {s.title || "Untitled"}
             </div>
-            <div className="text-[10px] text-peter-dim/70 mt-0.5 font-mono">
-              {s.updated_at ? new Date(s.updated_at).toLocaleString() : ""}
+            <div className="text-[10px] text-peter-dim/70 mt-0.5 font-mono flex items-center gap-1.5">
+              <span>{s.updated_at ? new Date(s.updated_at).toLocaleString() : ""}</span>
+              {replyLangMeta ? (
+                <span
+                  data-testid={`session-reply-lang-badge-${s.id}`}
+                  title={t("chat.replyLangActive", { lang: replyLangMeta.native })}
+                  className="inline-flex items-center gap-0.5 px-1 py-px rounded-sm bg-peter-gold/10 text-peter-gold border border-peter-gold/30 normal-case tracking-normal"
+                >
+                  <Globe size={9} weight="regular" />
+                  {replyLangMeta.code.toUpperCase()}
+                </span>
+              ) : null}
             </div>
           </div>
+          {showGlobe ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setTranslatorOpen((v) => !v);
+              }}
+              data-testid={`session-translator-btn-${s.id}`}
+              title={detectedMeta ? t("chat.threadLang", { lang: detectedMeta.native }) : ""}
+              className="text-peter-gold/70 hover:text-peter-gold p-1 transition-colors"
+            >
+              <Globe size={13} weight="regular" />
+            </button>
+          ) : null}
           <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5">
             <button
               onClick={(e) => {
@@ -374,6 +428,44 @@ function SessionItem({ s, active, onSelect, onRename, onDelete }) {
             <Trash size={12} weight="regular" />
             {t("chat.delete")}
           </button>
+        </div>
+      ) : null}
+      {translatorOpen && detectedMeta ? (
+        <div
+          className="mt-2 p-2.5 rounded-md bg-peter-black/95 border border-peter-gold/30 shadow-lg"
+          onClick={(e) => e.stopPropagation()}
+          data-testid={`session-translator-popover-${s.id}`}
+          dir={uiMeta.dir}
+        >
+          <div className="text-[10px] text-peter-dim/90 leading-snug">
+            {t("chat.threadLang", { lang: detectedMeta.native })}
+          </div>
+          <div className="text-[10px] text-peter-dim/70 mt-0.5 leading-snug">
+            {t("chat.translatorHint")}
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              type="button"
+              data-testid={`session-translator-apply-${s.id}`}
+              onClick={async () => {
+                setTranslatorOpen(false);
+                if (onApplyReplyLang) await onApplyReplyLang(s.id, uiLang);
+              }}
+              className="flex-1 text-[10px] tracking-widest uppercase text-peter-black bg-peter-gold hover:bg-peter-goldLight transition-colors px-2.5 py-1.5 rounded-sm font-medium inline-flex items-center justify-center gap-1"
+            >
+              <Globe size={10} weight="regular" />
+              {t("chat.replyIn", { lang: uiMeta.native })}
+            </button>
+            <button
+              type="button"
+              data-testid={`session-translator-dismiss-${s.id}`}
+              onClick={() => setTranslatorOpen(false)}
+              className="text-peter-dim hover:text-peter-ivory p-1.5 transition-colors"
+              aria-label="Close"
+            >
+              <X size={10} weight="bold" />
+            </button>
+          </div>
         </div>
       ) : null}
     </div>
@@ -531,6 +623,17 @@ export default function ChatView() {
     refreshSessions();
   };
 
+  const handleApplyReplyLang = async (id, lang) => {
+    try {
+      await setSessionReplyLang(id, lang);
+      refreshSessions();
+      // Also load the session immediately — user just opted into it.
+      loadSession(id);
+    } catch {
+      /* silent */
+    }
+  };
+
   const runTurn = useCallback(
     async (text, tier) => {
       const userMsg = {
@@ -680,6 +783,8 @@ export default function ChatView() {
                 onSelect={loadSession}
                 onRename={handleRename}
                 onDelete={handleDelete}
+                onApplyReplyLang={handleApplyReplyLang}
+                uiLang={i18n.language}
               />
             ))
           )}

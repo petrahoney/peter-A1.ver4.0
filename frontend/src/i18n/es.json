@@ -40,7 +40,12 @@
     "confirmDelete": "¿Eliminar \"{{title}}\"?",
     "didYouMean": "Parece que estás escribiendo en {{lang}} — ¿cambiar la interfaz?",
     "switchUi": "Cambiar",
-    "keepUi": "Mantener"
+    "keepUi": "Mantener",
+    "threadLang": "Esta conversación está en {{lang}}.",
+    "replyIn": "Responder en {{lang}}",
+    "replyLangActive": "Respuestas forzadas en {{lang}}",
+    "replyLangClear": "Quitar",
+    "translatorHint": "Abrir en tu idioma actual de la interfaz."
   },
   "cost": {
     "label": "Coste y Uso",

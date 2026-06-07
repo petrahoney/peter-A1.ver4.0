@@ -65,6 +65,35 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+_REPLY_LANG_NAMES: dict[str, str] = {
+    "en": "English",
+    "id": "Bahasa Indonesia",
+    "zh": "Mandarin Chinese (中文)",
+    "es": "Spanish (Español)",
+    "ar": "Arabic (العربية)",
+}
+
+
+def apply_reply_lang(message: str, reply_lang: Optional[str]) -> str:
+    """If a session has a `reply_lang` override, ask PETER to answer in that
+    language regardless of the user's input script. The directive is appended
+    so it doesn't pollute memory recall on the user's actual question.
+    """
+    if not reply_lang:
+        return message
+    name = _REPLY_LANG_NAMES.get(reply_lang)
+    if not name:
+        return message
+    # Framed as an explicit user preference — overrides the default
+    # auto-language-mirroring rule in the system prompt.
+    return (
+        f"{message}\n\n"
+        f"[User preference for THIS thread: please reply in {name}, even when "
+        f"my message is written in another language. This overrides the default "
+        f"mirror-the-input-language behaviour for this conversation only.]"
+    )
+
+
 # ───────────────────────── Schemas ─────────────────────────
 
 
@@ -164,6 +193,7 @@ async def chat(req: ChatRequest) -> dict[str, Any]:
         )
         memory_enabled = True if req.memory_enabled is None else bool(req.memory_enabled)
         ws_id = req.workspace_id
+        reply_lang = None
     else:
         updates = {}
         if req.force_tier is not None:
@@ -174,6 +204,7 @@ async def chat(req: ChatRequest) -> dict[str, Any]:
         if req.memory_enabled is not None:
             memory_enabled = bool(req.memory_enabled)
         ws_id = existing.get("workspace_id") or req.workspace_id
+        reply_lang = existing.get("reply_lang")
 
     # Save user message
     user_msg_id = str(uuid.uuid4())
@@ -195,7 +226,7 @@ async def chat(req: ChatRequest) -> dict[str, Any]:
             raise HTTPException(400, f"unknown tier: {req.force_tier}")
 
     result = await router_engine.route_and_run(
-        query=req.message,
+        query=apply_reply_lang(req.message, reply_lang),
         session_id=session_id,
         forced=forced,
         workspace_id=ws_id,
@@ -241,6 +272,7 @@ class SessionRenameRequest(BaseModel):
     force_tier: Optional[str] = None  # "free"|"cheap"|"smart"|"critical"|"" to clear
     memory_enabled: Optional[bool] = None
     workspace_id: Optional[str] = None  # "" or null to clear
+    reply_lang: Optional[str] = None  # 2-letter UI locale ("en"|"id"|"zh"|"es"|"ar"|"" to clear)
 
 
 @app.get("/api/sessions")
@@ -260,6 +292,7 @@ async def list_sessions(workspace_id: Optional[str] = None) -> dict[str, Any]:
                 "force_tier": s.get("force_tier"),
                 "memory_enabled": s.get("memory_enabled", True),
                 "workspace_id": s.get("workspace_id"),
+                "reply_lang": s.get("reply_lang"),
                 "created_at": s.get("created_at"),
                 "updated_at": s.get("updated_at"),
             }
@@ -289,6 +322,14 @@ async def update_session(session_id: str, req: SessionRenameRequest) -> dict[str
         updates["memory_enabled"] = bool(req.memory_enabled)
     if req.workspace_id is not None:
         updates["workspace_id"] = req.workspace_id or None
+    if req.reply_lang is not None:
+        rl = (req.reply_lang or "").strip().lower()
+        if rl == "":
+            updates["reply_lang"] = None
+        elif rl in {"en", "id", "zh", "es", "ar"}:
+            updates["reply_lang"] = rl
+        else:
+            raise HTTPException(400, f"unsupported reply_lang: {req.reply_lang}")
     if not updates:
         raise HTTPException(400, "no updates provided")
     updates["updated_at"] = now_iso()
@@ -302,6 +343,7 @@ async def update_session(session_id: str, req: SessionRenameRequest) -> dict[str
         "force_tier": s.get("force_tier"),
         "memory_enabled": s.get("memory_enabled", True),
         "workspace_id": s.get("workspace_id"),
+        "reply_lang": s.get("reply_lang"),
     }
 
 
@@ -344,6 +386,7 @@ async def get_messages(session_id: str) -> dict[str, Any]:
         "force_tier": session.get("force_tier") if session else None,
         "memory_enabled": session.get("memory_enabled", True) if session else True,
         "workspace_id": session.get("workspace_id") if session else None,
+        "reply_lang": session.get("reply_lang") if session else None,
         "messages": messages,
     }
 
@@ -814,6 +857,7 @@ async def chat_stream(req: ChatRequest):
         )
         memory_enabled = True if req.memory_enabled is None else bool(req.memory_enabled)
         ws_id = req.workspace_id
+        reply_lang = None
     else:
         updates = {}
         if req.force_tier is not None:
@@ -824,6 +868,7 @@ async def chat_stream(req: ChatRequest):
         if req.memory_enabled is not None:
             memory_enabled = bool(req.memory_enabled)
         ws_id = existing.get("workspace_id") or req.workspace_id
+        reply_lang = existing.get("reply_lang")
 
     await db.messages.insert_one(
         {
@@ -836,10 +881,11 @@ async def chat_stream(req: ChatRequest):
     )
 
     forced = TaskComplexity(req.force_tier.lower()) if req.force_tier else None
+    composed_message = apply_reply_lang(req.message, reply_lang)
 
     async def event_generator() -> AsyncIterator[str]:
         async for chunk in router_engine.route_and_stream(
-            req.message,
+            composed_message,
             session_id,
             forced=forced,
             workspace_id=ws_id,
