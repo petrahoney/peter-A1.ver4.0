@@ -2,8 +2,6 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   PaperPlaneRight,
   Sparkle,
-  Clock,
-  CurrencyDollar,
   Plus,
   PencilSimple,
   Trash,
@@ -20,8 +18,8 @@ import {
   deleteSession,
   setSessionTier,
 } from "../lib/api";
-import { streamChat } from "../lib/stream";
 import Markdown from "../components/Markdown";
+import useStreamingChat from "../hooks/useStreamingChat";
 
 const TIER_COLORS = {
   free: "#C0C0C0",
@@ -32,8 +30,41 @@ const TIER_COLORS = {
 
 const LAST_TIER_KEY = "peter_ai.last_force_tier";
 
+function StatsBadge({ m }) {
+  // Compact single-line badge: Tier: SMART | Tokens: 1234 | Cost: $0.00012 | Time: 1.2s
+  const elapsed = m.elapsed_ms != null ? m.elapsed_ms : m.latency_ms;
+  return (
+    <div
+      data-testid="msg-stats-badge"
+      className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-[11px] font-mono tnum"
+      style={{
+        background: "rgba(218, 165, 32, 0.1)",
+        border: "1px solid rgba(201, 168, 76, 0.25)",
+        color: "#E5E5E5",
+      }}
+    >
+      <span style={{ color: TIER_COLORS[m.tier] || "#C9A84C" }} className="font-semibold tracking-widest">
+        Tier: {String(m.tier || "—").toUpperCase()}
+      </span>
+      <span className="text-peter-dim">|</span>
+      <span>Tokens: {m.tokens_estimated != null ? m.tokens_estimated : "—"}</span>
+      <span className="text-peter-dim">|</span>
+      <span>Cost: ${Number(m.cost_usd || 0).toFixed(5)}</span>
+      <span className="text-peter-dim">|</span>
+      <span>Time: {elapsed != null ? (elapsed / 1000).toFixed(2) : "—"}s</span>
+      {m.saved_usd ? (
+        <>
+          <span className="text-peter-dim">|</span>
+          <span style={{ color: "#C9A84C" }}>Saved: ${Number(m.saved_usd).toFixed(5)}</span>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function MessageBubble({ m, streaming }) {
   const isUser = m.role === "user";
+  const hasStats = !isUser && (m.cost_usd != null || m.tokens_estimated != null);
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -46,9 +77,10 @@ function MessageBubble({ m, streaming }) {
         className={[
           "max-w-[80%] p-5 rounded-lg",
           isUser
-            ? "bg-peter-navy2 text-peter-ivory border-l-2 border-peter-silver rounded-bl-lg rounded-tr-sm"
-            : "bg-peter-navy border border-peter-gold/20 text-peter-ivory rounded-lg",
+            ? "bg-peter-navy2 border-l-2 border-peter-silver rounded-bl-lg rounded-tr-sm"
+            : "bg-peter-navy border border-peter-gold/20 rounded-lg",
         ].join(" ")}
+        style={{ color: "#E5E5E5" }}
       >
         {!isUser && (m.tier || streaming) ? (
           <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -67,26 +99,15 @@ function MessageBubble({ m, streaming }) {
             {m.model ? (
               <span className="text-[10px] text-peter-dim font-mono">{m.model}</span>
             ) : null}
-            {m.cost_usd != null ? (
-              <span className="text-[10px] text-peter-dim tnum inline-flex items-center gap-1">
-                <CurrencyDollar size={10} weight="bold" />
-                {Number(m.cost_usd).toFixed(5)}
-              </span>
-            ) : null}
-            {m.latency_ms != null ? (
-              <span className="text-[10px] text-peter-dim tnum inline-flex items-center gap-1">
-                <Clock size={10} weight="bold" />
-                {m.latency_ms} ms
-              </span>
-            ) : null}
-            {m.saved_usd ? (
-              <span className="text-[10px] text-peter-gold tnum">
-                saved ${Number(m.saved_usd).toFixed(5)}
-              </span>
-            ) : null}
             {streaming ? (
-              <span className="text-[10px] text-peter-gold/80 inline-flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-peter-gold animate-pulse" />
+              <span
+                className="text-[10px] inline-flex items-center gap-1"
+                style={{ color: "#C9A84C" }}
+              >
+                <span
+                  className="w-1.5 h-1.5 rounded-full animate-pulse"
+                  style={{ background: "#C9A84C" }}
+                />
                 streaming
               </span>
             ) : null}
@@ -98,10 +119,17 @@ function MessageBubble({ m, streaming }) {
           </div>
         ) : (
           <div className="text-[15px] font-light">
-            <Markdown>{m.content}</Markdown>
-            {streaming && !m.content ? (
+            {m.content ? (
+              <Markdown>{m.content}</Markdown>
+            ) : streaming ? (
               <span className="text-peter-dim italic">Thinking…</span>
             ) : null}
+            {streaming ? (
+              <span className="cursor-blink" aria-hidden="true">
+                ▌
+              </span>
+            ) : null}
+            {hasStats ? <StatsBadge m={m} /> : null}
           </div>
         )}
       </div>
@@ -228,11 +256,18 @@ export default function ChatView() {
       return "";
     }
   });
-  const [streaming, setStreaming] = useState(false);
   const [tierCatalog, setTierCatalog] = useState({});
   const [sessions, setSessions] = useState([]);
+  const [queuedCount, setQueuedCount] = useState(0);
   const scrollerRef = useRef(null);
-  const abortRef = useRef(null);
+  const queueRef = useRef([]);
+  const sessionIdRef = useRef(null);
+  const { streaming, start: startStream, stop: stopStream } = useStreamingChat();
+
+  // Keep a ref of the live session id so the queue can use the latest value.
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
 
   useEffect(() => {
     tiers().then((r) => setTierCatalog(r.tiers)).catch(() => {});
@@ -255,7 +290,7 @@ export default function ChatView() {
   }, []);
 
   const loadSession = useCallback(async (id) => {
-    if (abortRef.current) abortRef.current.abort();
+    stopStream();
     setSessionId(id);
     setMessages([]);
     try {
@@ -271,18 +306,20 @@ export default function ChatView() {
           cost_usd: m.cost_usd,
           saved_usd: m.saved_usd,
           latency_ms: m.latency_ms,
+          tokens_estimated: m.tokens_estimated,
         }))
       );
     } catch {
       /* silent */
     }
-  }, []);
+  }, [stopStream]);
 
   const newSession = () => {
-    if (abortRef.current) abortRef.current.abort();
+    stopStream();
     setSessionId(null);
     setMessages([]);
-    // Keep the user's last preference instead of resetting to Auto.
+    queueRef.current = [];
+    setQueuedCount(0);
     try {
       const last = localStorage.getItem(LAST_TIER_KEY) || "";
       setForceTier(last);
@@ -310,9 +347,7 @@ export default function ChatView() {
     }
   };
 
-  const stopStreaming = () => {
-    if (abortRef.current) abortRef.current.abort();
-  };
+  const stopStreaming = () => stopStream();
 
   const handleRename = async (id, title) => {
     await renameSession(id, title);
@@ -325,77 +360,103 @@ export default function ChatView() {
     refreshSessions();
   };
 
-  const send = async () => {
-    if (!input.trim() || streaming) return;
+  const runTurn = useCallback(
+    async (text, tier) => {
+      const userMsg = {
+        id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        role: "user",
+        content: text,
+      };
+      const aiId = `a-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const aiMsg = { id: aiId, role: "assistant", content: "" };
+      setMessages((prev) => [...prev, userMsg, aiMsg]);
+
+      let liveSessionId = sessionIdRef.current;
+
+      await startStream(
+        {
+          message: text,
+          session_id: sessionIdRef.current,
+          force_tier: tier || null,
+        },
+        {
+          onRoute: (meta) => {
+            liveSessionId = meta.session_id;
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === aiId ? { ...m, tier: meta.tier, model: meta.model } : m,
+              ),
+            );
+          },
+          onDelta: (chunk) => {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === aiId ? { ...m, content: (m.content || "") + chunk } : m,
+              ),
+            );
+          },
+          onDone: (stats) => {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === aiId
+                  ? {
+                      ...m,
+                      tier: stats.tier || m.tier,
+                      model: stats.model || m.model,
+                      cost_usd: stats.cost_usd,
+                      saved_usd: stats.saved_usd,
+                      latency_ms: stats.latency_ms,
+                      elapsed_ms: stats.elapsed_ms,
+                      tokens_estimated: stats.tokens_estimated,
+                    }
+                  : m,
+              ),
+            );
+          },
+          onError: (err) => {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === aiId
+                  ? {
+                      ...m,
+                      content: `**Stream error.** ${err.message || "Connection lost."}`,
+                    }
+                  : m,
+              ),
+            );
+          },
+        },
+      );
+
+      if (liveSessionId && liveSessionId !== sessionIdRef.current) {
+        sessionIdRef.current = liveSessionId;
+        setSessionId(liveSessionId);
+      }
+      refreshSessions();
+    },
+    [startStream, refreshSessions],
+  );
+
+  // Drain the queue whenever streaming flips false.
+  useEffect(() => {
+    if (streaming) return;
+    if (queueRef.current.length === 0) return;
+    const next = queueRef.current.shift();
+    setQueuedCount(queueRef.current.length);
+    runTurn(next.text, next.tier);
+  }, [streaming, runTurn]);
+
+  const send = () => {
+    if (!input.trim()) return;
     const text = input.trim();
     setInput("");
-
-    const userMsg = {
-      id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      role: "user",
-      content: text,
-    };
-    const aiId = `a-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const aiMsg = { id: aiId, role: "assistant", content: "" };
-    setMessages((prev) => [...prev, userMsg, aiMsg]);
-    setStreaming(true);
-
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
-
-    let liveSessionId = sessionId;
-
-    await streamChat(
-      { message: text, session_id: sessionId, force_tier: forceTier || null },
-      {
-        onRoute: (meta) => {
-          liveSessionId = meta.session_id;
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === aiId ? { ...m, tier: meta.tier, model: meta.model } : m
-            )
-          );
-        },
-        onDelta: (chunk) => {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === aiId ? { ...m, content: (m.content || "") + chunk } : m
-            )
-          );
-        },
-        onDone: (stats) => {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === aiId
-                ? {
-                    ...m,
-                    tier: stats.tier || m.tier,
-                    cost_usd: stats.cost_usd,
-                    saved_usd: stats.saved_usd,
-                    latency_ms: stats.latency_ms,
-                  }
-                : m
-            )
-          );
-        },
-        onError: (err) => {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === aiId
-                ? { ...m, content: `An error occurred: ${err.message}` }
-                : m
-            )
-          );
-        },
-      },
-      ctrl.signal
-    );
-
-    setStreaming(false);
-    if (liveSessionId && liveSessionId !== sessionId) {
-      setSessionId(liveSessionId);
+    if (streaming) {
+      // Queue it; will fire automatically when the current stream finishes.
+      queueRef.current.push({ text, tier: forceTier });
+      setQueuedCount(queueRef.current.length);
+      return;
     }
-    refreshSessions();
+    runTurn(text, forceTier);
   };
 
   const onKey = (e) => {
@@ -524,36 +585,46 @@ export default function ChatView() {
         </div>
 
         <div className="px-12 py-6 border-t border-peter-gold/10 bg-peter-black">
+          {queuedCount > 0 ? (
+            <div
+              data-testid="queue-indicator"
+              className="mb-2 text-[10px] tracking-[0.3em] uppercase text-peter-gold/80"
+            >
+              {queuedCount} message{queuedCount === 1 ? "" : "s"} queued
+            </div>
+          ) : null}
           <div className="flex gap-3 items-end">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKey}
-              placeholder="Speak with PETER…"
+              placeholder={
+                streaming
+                  ? "Continue composing — your next turn will queue…"
+                  : "Speak with PETER…"
+              }
               rows={2}
               data-testid="chat-input"
-              className="flex-1 bg-peter-navy2 border border-peter-gold/20 focus:border-peter-gold/60 focus:outline-none text-peter-ivory px-4 py-3 rounded-md resize-none font-light placeholder:text-peter-dim/60 transition-colors"
+              className="flex-1 bg-peter-navy2 border border-peter-gold/20 focus:border-peter-gold/60 focus:outline-none px-4 py-3 rounded-md resize-none font-light placeholder:text-peter-dim/60 transition-colors"
+              style={{ color: "#E5E5E5" }}
             />
+            {streaming ? (
+              <button
+                onClick={stopStreaming}
+                data-testid="chat-stop"
+                className="bg-peter-navy2 text-peter-gold border border-peter-gold/60 hover:bg-peter-gold/10 transition-colors px-4 py-3 rounded-md font-medium inline-flex items-center gap-2"
+              >
+                <Stop size={16} weight="fill" /> Stop
+              </button>
+            ) : null}
             <button
-              onClick={streaming ? stopStreaming : send}
-              disabled={!streaming && !input.trim()}
-              data-testid={streaming ? "chat-stop" : "chat-send"}
-              className={[
-                "transition-colors px-5 py-3 rounded-md font-medium inline-flex items-center gap-2",
-                streaming
-                  ? "bg-peter-navy2 text-peter-gold border border-peter-gold/60 hover:bg-peter-gold/10"
-                  : "bg-peter-gold disabled:opacity-40 text-peter-black hover:bg-peter-goldLight",
-              ].join(" ")}
+              onClick={send}
+              disabled={!input.trim()}
+              data-testid="chat-send"
+              className="bg-peter-gold disabled:opacity-40 text-peter-black hover:bg-peter-goldLight transition-colors px-5 py-3 rounded-md font-medium inline-flex items-center gap-2"
             >
-              {streaming ? (
-                <>
-                  <Stop size={16} weight="fill" /> Stop
-                </>
-              ) : (
-                <>
-                  <PaperPlaneRight size={16} weight="fill" /> Send
-                </>
-              )}
+              <PaperPlaneRight size={16} weight="fill" />
+              {streaming ? "Queue" : "Send"}
             </button>
           </div>
         </div>

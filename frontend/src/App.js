@@ -77,7 +77,7 @@ function Sidebar() {
           v4.0 · The Luxury Strategist
         </div>
         <div className="mt-1 text-xs text-peter-dim/70 font-light">
-          Powered by Emergent Universal Key
+          Sovereign intelligence platform
         </div>
       </div>
     </aside>

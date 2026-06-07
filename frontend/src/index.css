@@ -102,6 +102,21 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Blinking gold cursor used at the tail of streaming assistant messages */
+.cursor-blink {
+  display: inline-block;
+  color: #c9a84c;
+  font-weight: 400;
+  animation: cursorBlink 1s steps(2, start) infinite;
+  margin-left: 2px;
+  transform: translateY(-1px);
+}
+@keyframes cursorBlink {
+  to {
+    visibility: hidden;
+  }
+}
+
 /* Custom scrollbar */
 *::-webkit-scrollbar {
   width: 10px;

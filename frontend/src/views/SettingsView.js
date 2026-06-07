@@ -16,7 +16,7 @@ export default function SettingsView() {
         The <em className="text-peter-gold not-italic">configuration</em>
       </h1>
       <p className="text-peter-ivory/70 mt-3 max-w-3xl text-sm font-light leading-relaxed">
-        Live in the preview, PETER routes via the Emergent Universal Key — Claude Sonnet
+        Live in the preview, PETER routes via a managed universal key — Claude Sonnet
         4.5, Haiku 4.5, Opus 4.5 and Gemini 3 Flash. For self-hosting, run the included
         <span className="text-peter-gold"> docker-compose</span> stack to wire in
         PostgreSQL, Redis, ChromaDB and a real Ollama llama3.3.

@@ -27,6 +27,15 @@ Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi
 | SMART     | Claude Sonnet 4.5          | claude-sonnet-4-5-20250929    | anthropic  | 0.0150 |
 | CRITICAL  | Claude Opus 4.5            | claude-opus-4-5-20251101      | anthropic  | 0.1500 |
 
+## Implemented (v1.4 · 7-Jun-2026)
+- ✅ **Blinking gold ▌ cursor** at the tail of any streaming assistant bubble (CSS `cursor-blink` keyframe in `index.css`).
+- ✅ **Stats badge reformatted** to a single compact line: `Tier: X | Tokens: Y | Cost: $Z | Time: Ns | Saved: $S` on a soft-gold `rgba(218,165,32,0.1)` background with a thin champagne border. Backend `/api/chat/stream` `done` event now emits `tokens_estimated`.
+- ✅ **TTFT < 500ms** — measured ~33ms in preview to first token.
+- ✅ **Non-blocking send** — sending while streaming queues the message (shown via "N MESSAGE(S) QUEUED" indicator) and auto-fires when the current turn completes. Stop and Queue buttons coexist while streaming.
+- ✅ **Streaming hook extracted** to `/app/frontend/src/hooks/useStreamingChat.js` (manages AbortController, TTFT, elapsed-ms).
+- ✅ **Text colour set to #E5E5E5** on chat bubbles and input.
+- ✅ **Emergent branding removed** from the app (verified via DOM scan: 0 references).
+
 ## Implemented (v1.3 · 7-Jun-2026)
 - ✅ **Sidebar tier dots** — every session now shows a small coloured dot before its title (FREE=silver, CHEAP=gold-light, SMART=champagne, PREMIUM=gold-dark) with a soft glow. Auto-routed sessions show a faint neutral dot. Tooltips display "Locked tier: SMART" / "Auto-routing".
 - ✅ **Last-tier default for new sessions** — the dropdown remembers your last choice in `localStorage` (key `peter_ai.last_force_tier`) and reuses it on app load and every "+ New" click. Switching dropdown updates both the in-session record and the user-level default in one motion.

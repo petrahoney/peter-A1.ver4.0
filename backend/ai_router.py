@@ -262,5 +262,5 @@ class AIRouter:
 
         yield (
             "event: done\n"
-            f"data: {json.dumps({'cost_usd': cost_usd, 'saved_usd': saved_usd, 'latency_ms': latency_ms, 'tier': tier.value})}\n\n"
+            f"data: {json.dumps({'cost_usd': cost_usd, 'saved_usd': saved_usd, 'latency_ms': latency_ms, 'tier': tier.value, 'model': meta['preview_model'], 'tokens_estimated': tokens})}\n\n"
         )
