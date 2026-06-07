@@ -29,6 +29,11 @@ from pydantic import BaseModel, Field
 
 from ai_router import AIRouter, TaskComplexity, TIER_CATALOG
 from crew_manager import PeterCrewManager, AGENT_BLUEPRINT
+from script_studio import (
+    generate_script as studio_generate_script,
+    evaluate_script as studio_evaluate_script,
+    generate_genius_prompt as studio_generate_genius_prompt,
+)
 from i18n import (
     pick_locale,
     translate_agents,
@@ -754,6 +759,141 @@ async def memory_delete(memory_id: str) -> dict[str, Any]:
 async def memory_clear(workspace_id: Optional[str] = None) -> dict[str, Any]:
     n = await memory_engine.clear_all(workspace_id=workspace_id)
     return {"cleared": n, "workspace_id": workspace_id}
+
+
+# ───────────────────────── Script Studio (P14 / P17 / P18) ─────────────────────────
+
+
+class ScriptGenerateRequest(BaseModel):
+    topic: str
+    platform: str = "tiktok"
+    style: str = "viral"
+    target_language: str = "en"
+    genius_prompt_id: Optional[str] = None  # if set, load saved prompt from DB
+
+
+class ScriptEvaluateRequest(BaseModel):
+    script: str
+    platform: str = "tiktok"
+
+
+class GeniusPromptRequest(BaseModel):
+    topic: str
+    platform: str = "tiktok"
+    style: str = "viral"
+    target_score: float = 8.5
+    iterations: int = 1  # 1=fast (~30s), 2-3=slower but better. Proxy cap ~100s.
+    save: bool = True
+
+
+@app.post("/api/script/generate")
+async def script_generate(req: ScriptGenerateRequest) -> dict[str, Any]:
+    genius_prompt_text: Optional[str] = None
+    if req.genius_prompt_id:
+        doc = await db.genius_prompts.find_one({"_id": req.genius_prompt_id})
+        if not doc:
+            raise HTTPException(404, "genius prompt not found")
+        genius_prompt_text = doc.get("genius_prompt")
+    try:
+        out = await studio_generate_script(
+            req.topic, req.platform, req.style, req.target_language, genius_prompt_text,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    record = {
+        "_id": uuid.uuid4().hex,
+        "topic": req.topic,
+        "platform": req.platform,
+        "style": req.style,
+        "language": req.target_language,
+        "genius_prompt_id": req.genius_prompt_id,
+        "script": out.get("script"),
+        "hook": out.get("hook"),
+        "cta": out.get("cta"),
+        "tags": out.get("tags", []),
+        "duration_sec": out.get("duration_sec"),
+        "created_at": now_iso(),
+    }
+    await db.scripts.insert_one(record)
+    out["id"] = record["_id"]
+    return out
+
+
+@app.post("/api/script/evaluate")
+async def script_evaluate(req: ScriptEvaluateRequest) -> dict[str, Any]:
+    try:
+        out = await studio_evaluate_script(req.script, req.platform)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    await db.script_evaluations.insert_one(
+        {
+            "_id": uuid.uuid4().hex,
+            "platform": req.platform,
+            "scores": out.get("scores"),
+            "overall_score": out.get("overall_score"),
+            "weaknesses": out.get("weaknesses", []),
+            "strengths": out.get("strengths", []),
+            "created_at": now_iso(),
+        }
+    )
+    return out
+
+
+@app.post("/api/genius-prompt/generate")
+async def genius_prompt_generate(req: GeniusPromptRequest) -> dict[str, Any]:
+    try:
+        out = await studio_generate_genius_prompt(
+            req.topic, req.platform, req.style, req.target_score, req.iterations,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    if req.save:
+        doc = {**out, "_id": out["id"]}
+        del doc["id"]
+        await db.genius_prompts.insert_one(doc)
+    return out
+
+
+@app.get("/api/genius-prompts")
+async def genius_prompts_list() -> dict[str, Any]:
+    cursor = db.genius_prompts.find({}, sort=[("created_at", -1)]).limit(50)
+    items = []
+    async for d in cursor:
+        items.append(
+            {
+                "id": d["_id"],
+                "topic": d.get("topic"),
+                "platform": d.get("platform"),
+                "style": d.get("style"),
+                "expected_quality_score": d.get("expected_quality_score"),
+                "confidence": d.get("confidence"),
+                "best_iteration": d.get("best_iteration"),
+                "created_at": d.get("created_at"),
+            }
+        )
+    return {"items": items}
+
+
+@app.get("/api/genius-prompts/{prompt_id}")
+async def genius_prompt_detail(prompt_id: str) -> dict[str, Any]:
+    d = await db.genius_prompts.find_one({"_id": prompt_id})
+    if not d:
+        raise HTTPException(404, "not found")
+    return {
+        "id": d.get("_id"),
+        "topic": d.get("topic"),
+        "platform": d.get("platform"),
+        "style": d.get("style"),
+        "target_score": d.get("target_score"),
+        "best_iteration": d.get("best_iteration"),
+        "expected_quality_score": d.get("expected_quality_score"),
+        "genius_prompt": d.get("genius_prompt"),
+        "rationale": d.get("rationale"),
+        "focus_dimensions": d.get("focus_dimensions", []),
+        "evolution": d.get("evolution", []),
+        "confidence": d.get("confidence"),
+        "created_at": d.get("created_at"),
+    }
 
 
 # ───────────────────────── Project Workspaces ─────────────────────────

@@ -13,6 +13,7 @@ import {
   Stack,
   CaretDown,
   Plus,
+  FilmStrip,
 } from "@phosphor-icons/react";
 
 import HomeView from "./views/HomeView";
@@ -23,6 +24,7 @@ import CostView from "./views/CostView";
 import MemoryView from "./views/MemoryView";
 import SettingsView from "./views/SettingsView";
 import WorkspacesView from "./views/WorkspacesView";
+import StudioView from "./views/StudioView";
 import LanguageSwitcher from "./components/LanguageSwitcher";
 
 import { WorkspaceProvider, useWorkspace } from "./context/WorkspaceContext";
@@ -35,6 +37,7 @@ const NAV_ITEMS = [
   { to: "/chat", key: "chat", icon: ChatCircleDots, testid: "nav-chat" },
   { to: "/router", key: "router", icon: Graph, testid: "nav-router" },
   { to: "/crew", key: "crew", icon: UsersThree, testid: "nav-crew" },
+  { to: "/studio", key: "studio", icon: FilmStrip, testid: "nav-studio" },
   { to: "/memory", key: "memory", icon: Brain, testid: "nav-memory" },
   { to: "/workspaces", key: "workspaces", icon: Stack, testid: "nav-workspaces" },
   { to: "/cost", key: "cost", icon: ChartLineUp, testid: "nav-cost" },
@@ -206,6 +209,7 @@ export default function App() {
             <Route path="/chat" element={<ChatView />} />
             <Route path="/router" element={<RouterView />} />
             <Route path="/crew" element={<CrewView />} />
+            <Route path="/studio" element={<StudioView />} />
             <Route path="/memory" element={<MemoryView />} />
             <Route path="/workspaces" element={<WorkspacesView />} />
             <Route path="/cost" element={<CostView />} />

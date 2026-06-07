@@ -73,6 +73,19 @@ export const setSessionWorkspace = (session_id, workspace_id) =>
 export const setSessionReplyLang = (session_id, reply_lang) =>
   api.patch(`/sessions/${session_id}`, { reply_lang: reply_lang || "" }).then((r) => r.data);
 
+// ─────── Script Studio (P14 / P17 / P18) ───────
+export const scriptGenerate = (body) =>
+  api.post("/script/generate", body).then((r) => r.data);
+
+export const scriptEvaluate = (body) =>
+  api.post("/script/evaluate", body, { timeout: 90000 }).then((r) => r.data);
+
+export const geniusPromptGenerate = (body) =>
+  api.post("/genius-prompt/generate", body, { timeout: 95000 }).then((r) => r.data);
+
+export const geniusPromptsList = () =>
+  api.get("/genius-prompts").then((r) => r.data);
+
 export const listWorkspaces = () =>
   api.get("/workspaces").then((r) => r.data);
 

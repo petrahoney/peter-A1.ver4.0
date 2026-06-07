@@ -27,7 +27,35 @@ Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi
 | SMART     | Claude Sonnet 4.5          | claude-sonnet-4-5-20250929    | anthropic  | 0.0150 |
 | CRITICAL  | Claude Opus 4.5            | claude-opus-4-5-20251101      | anthropic  | 0.1500 |
 
-## Implemented (v4.5 · 8-Jun-2026 — Backend i18n via Accept-Language)
+## Implemented (v5.0 · 8-Jun-2026 — Script Studio: Prompts 14 + 17 + 18)
+
+### New backend module `/app/backend/script_studio.py`
+- ✅ **`generate_script(topic, platform, style, lang, [genius_prompt])`** (Prompt 14) — produces SCENE-blocked script + hook + CTA + hashtags + duration; CHEAP tier (Haiku) for low iteration cost.
+- ✅ **`evaluate_script(script, platform)`** (Prompt 17) — SMART tier (Sonnet) returns 0-10 scores across hook/pacing/cta/value/platform_optimization, strengths + weaknesses, and 3 improved variants (A: stronger hook · B: better pacing · C: stronger CTA) with projected score deltas + recommendation.
+- ✅ **`generate_genius_prompt(topic, platform, style, target, N)`** (Prompt 18) — self-improving loop: each iteration proposes a prompt → uses it to generate a sample script → scores it → refines based on the weakest dimension. Stops on target hit, plateau (<0.2 gain), or N iterations.
+
+### New endpoints in `server.py`
+- ✅ `POST /api/script/generate` — body `{topic, platform, style, target_language, genius_prompt_id?}`; persists every run to `db.scripts`.
+- ✅ `POST /api/script/evaluate` — body `{script, platform}`; persists scores to `db.script_evaluations`.
+- ✅ `POST /api/genius-prompt/generate` — body `{topic, platform, style, target_score, iterations, save}`; persists to `db.genius_prompts` when `save=true`.
+- ✅ `GET /api/genius-prompts` — last 50, light fields.
+- ✅ `GET /api/genius-prompts/{id}` — full payload including evolution history.
+- Iteration default lowered to 1 (proxy 100s cap; 1 iter ≈ 30s, 2 ≈ 60s).
+
+### Frontend: `/studio` view
+- ✅ New sidebar nav entry (FilmStrip icon, key `nav.studio`) inserted between Crew Builder and Memory.
+- ✅ `StudioView.js`: Topic + Platform + Style + Language inputs; **Generate / Evaluate / Genius-prompt loop** action row with iteration + target-score knobs.
+- ✅ Two-column board: left → generated script (hook, scenes, hashtags) + 5-dimension score bars + strengths/weaknesses; right → 3 optimised variants with projected % improvement, recommendation card, genius-prompt panel with full prompt text + evolution history + Apply button + saved prompts library.
+- ✅ "Apply" mode chains a saved genius prompt into the next `scriptGenerate` call (badge appears on the script card).
+- ✅ Localised in all 5 locales: studio.* + nav.studio.
+
+### Verified
+- cURL: `/api/script/generate` returns hook + 6 scenes + 8 hashtags + 45s duration.
+- cURL: `/api/script/evaluate` returns scores ranging 2.0-5.5 + 3 variants + recommendation.
+- cURL: `/api/genius-prompt/generate` with `iterations=1` completes in ~30s, score 7.3, confidence 0.91, evolution history present.
+- Playwright e2e: full flow Generate → Evaluate → 3 variants rendered with scores 7.5-7.8 + recommendation text intact.
+
+
 
 ### New backend module `/app/backend/i18n.py`
 - ✅ `pick_locale(header)` — parses Accept-Language, handles `en-US` → `en`, falls back to `en`.
@@ -171,6 +199,13 @@ Five prompts in user message #347 audited and closed.
 ### Integration test (Prompt 5)
 - TTFT **22 ms** (target < 500 ms)
 - Stats badge, sidebar (11 sessions), Workspaces (2 cards), Memory List/Graph, Export, Memory toggle — all green.
+
+## Implemented (v4.5 · 8-Jun-2026 — Backend i18n via Accept-Language)
+- ✅ New module `backend/i18n.py` with `pick_locale()` + translation tables for agents, tiers, status enum.
+- ✅ `/api/agents`, `/api/tiers`, `/api/crew/runs/{id}`, `/api/stats` localise display fields via `Accept-Language` header.
+- ✅ Frontend axios interceptor auto-injects `Accept-Language: <i18n.language>` on every request.
+- ✅ Status badges + tier names/purposes now flip with locale.
+
 
 ## Implemented (v4.4 · 8-Jun-2026 — Crew/Switcher Fixes + View Body i18n)
 - ✅ Crew Builder card overlap fixed (220px width, line-clamp-2, wider node positions).
@@ -336,5 +371,7 @@ Four cohesive additions; PETER is now a **portfolio of private councils**.
 - ✅ HTML `<meta description>` + OG tags + FastAPI app title updated.
 
 ## Next Action Items
-- Iteration 7 closed (Backend i18n). With Accept-Language wired through axios, switching UI to any locale now translates: nav, page headlines + bodies, crew agent roles + goals + statuses, tier names + purposes, switcher options, didYouMean hints, sidebar 🌐 session translator, footer brand (locked LTR).
-- P2 backlog: backstory + task fields stay EN (intentional — LLM-facing); per-session system-prompt versioning; WorkspaceSelector outside-click close; React Router v7 future flags; "Clear override" UX on the EN/ID/ZH/ES/AR badge.
+- Iteration 8 (Script Studio MVP) closed. Foundation for Prompts 17 + 18 ready (Prompt 14 = script generation now lives on `/studio`).
+- **User verification**: `/studio` → enter topic → Generate → Evaluate → see 3 variants + scores. Optional: tap "Run genius-prompt loop" with iterations=1 (~30s) → applies a saved genius prompt to next script.
+- Skipped per scope: **Prompt 19** (revenue prediction) — needs real published-video analytics; will pick up once integrations exist.
+- P2 backlog: SSE stream for `genius-prompt/generate` so >1 iteration doesn't hit proxy 100s cap; library deletion + cross-locale prompt deduplication; per-session system-prompt versioning; React Router v7 future flags.
