@@ -1,0 +1,68 @@
+# PETER AI v4.0 — Product Requirements Document
+
+## Original problem statement
+Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi-model routing, CrewAI orchestration, and local-first deployment (Docker Compose). Frontend Next.js, backend FastAPI, PostgreSQL + Redis + ChromaDB + Ollama. Phase 1 local self-host; Phase 2 cloud-ready.
+
+## User choices (verbatim, 7-Jun-2026)
+1. Platform/Stack: **(c) Parallel-track strategy** — live MVP on Emergent stack PLUS docker-compose artifacts for self-host.
+2. AI Models: **(c) Emergent Universal Key + Ollama-style FREE tier simulated locally for demo.**
+3. CrewAI Workflow: **(a) Full 7-agent app-builder crew** (Architect, Frontend, Backend, DBA, DevOps, QA, Documenter).
+4. Auth: **(c) Skip auth in MVP.**
+5. UI Direction: PETER AI brand — Deep Black + Champagne Gold, subtle glass-morphism with gold accents, Cormorant Garamond + Montserrat, router/agents as luxury flow diagrams. "Luxury strategist's command center" feel.
+
+## Architecture
+- **Frontend** `/app/frontend` — React + Tailwind + React Router + React Flow + Recharts + Framer Motion + @phosphor-icons/react.
+- **Backend** `/app/backend` — FastAPI + Motor (MongoDB) + emergentintegrations.
+  - `ai_router.py` — pattern + heuristic classifier → 4 tiers (FREE/CHEAP/SMART/CRITICAL).
+  - `crew_manager.py` — sequential 7-agent orchestration built directly on emergentintegrations.
+  - `server.py` — REST API surface.
+- **DB** MongoDB collections: `sessions`, `messages`, `crew_runs`.
+- **Deploy** `/app/deploy` — full docker-compose stack (Next.js-parallel + Postgres + Redis + ChromaDB + Mongo + Ollama + Nginx) for self-host parity.
+
+## Models (preview tier mapping)
+| Tier      | Self-host                  | Preview substitute            | Provider   | $/1K   |
+| --------- | -------------------------- | ----------------------------- | ---------- | ------ |
+| FREE      | Ollama llama3.3            | gemini-3-flash-preview        | gemini     | 0.0000 |
+| CHEAP     | Claude Haiku 4.5           | claude-haiku-4-5-20251001     | anthropic  | 0.0010 |
+| SMART     | Claude Sonnet 4.5          | claude-sonnet-4-5-20250929    | anthropic  | 0.0150 |
+| CRITICAL  | Claude Opus 4.5            | claude-opus-4-5-20251101      | anthropic  | 0.1500 |
+
+## Implemented (v1.0 · 7-Jun-2026)
+- ✅ Hero command center with live aggregated stats and tier showcase.
+- ✅ Multi-turn chat with model badge (tier, model, cost, latency, saved).
+- ✅ AI Router visualization (React Flow) with classifier → 4 tiers + active routing animation.
+- ✅ Pattern + heuristic classifier (no LLM call for routing).
+- ✅ 7-agent CrewAI orchestration with live status polling and per-agent output panel.
+- ✅ Cost & Usage dashboard: total queries, total cost, savings ledger, donut, bar chart, recent table.
+- ✅ Settings view with tier catalogue + self-host quick-start.
+- ✅ Force-tier override in chat.
+- ✅ Self-host docker-compose stack at `/app/deploy/` (Postgres + Redis + ChromaDB + Mongo + Ollama + Nginx).
+
+## Endpoints
+- `GET  /api/`                       — meta
+- `GET  /api/tiers`                  — tier catalogue
+- `GET  /api/agents`                 — crew blueprint
+- `POST /api/router/classify`        — instant classification
+- `POST /api/chat`                   — route & run a chat turn
+- `POST /api/chat/stream`            — SSE streaming variant
+- `GET  /api/sessions`               — list chat sessions
+- `GET  /api/sessions/{id}/messages` — chat history
+- `POST /api/crew/build`             — start 7-agent build
+- `GET  /api/crew/runs/{id}`         — poll status
+- `GET  /api/crew/runs`              — list past runs
+- `GET  /api/stats`                  — dashboard data
+
+## Backlog (P1)
+- Streaming chat UI (token-by-token) — backend SSE already in place.
+- Markdown rendering in agent output and chat (currently plain).
+- Session sidebar with switch / rename / delete in Chat view.
+
+## Backlog (P2)
+- Real Ollama integration for FREE tier in preview (would require Ollama deploy).
+- Auth (JWT or Emergent Google Auth).
+- Token-accurate billing via provider usage payloads instead of estimate.
+- Export crew artifact bundle as a ZIP / GitHub PR.
+
+## Next Action Items
+- Validate all flows via testing subagent.
+- If green, deliver to user; gather feedback on streaming / markdown polish.
