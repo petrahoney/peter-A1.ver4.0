@@ -886,6 +886,7 @@ async def genius_prompt_detail(prompt_id: str) -> dict[str, Any]:
         "topic": d.get("topic"),
         "platform": d.get("platform"),
         "style": d.get("style"),
+        "language": d.get("language"),
         "target_score": d.get("target_score"),
         "best_iteration": d.get("best_iteration"),
         "expected_quality_score": d.get("expected_quality_score"),

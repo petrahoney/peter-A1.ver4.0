@@ -1,23 +1,25 @@
-# PETER AI v4.0 — Product Requirements Document
+# PETER AI v5.1 — Product Requirements Document
 
 ## Original problem statement
-Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi-model routing, CrewAI orchestration, and local-first deployment (Docker Compose). Frontend Next.js, backend FastAPI, PostgreSQL + Redis + ChromaDB + Ollama. Phase 1 local self-host; Phase 2 cloud-ready.
+Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi-model routing, CrewAI orchestration, and local-first deployment (Docker Compose). Frontend Next.js / React, backend FastAPI, PostgreSQL + Redis + ChromaDB + Ollama. Phase 1 local self-host; Phase 2 cloud-ready.
 
-## User choices (verbatim, 7-Jun-2026)
-1. Platform/Stack: **(c) Parallel-track strategy** — live MVP on Emergent stack PLUS docker-compose artifacts for self-host.
-2. AI Models: **(c) Emergent Universal Key + Ollama-style FREE tier simulated locally for demo.**
-3. CrewAI Workflow: **(a) Full 7-agent app-builder crew** (Architect, Frontend, Backend, DBA, DevOps, QA, Documenter).
+## User choices (verbatim)
+1. Platform/Stack: **(c) Parallel-track** — live MVP on Emergent stack + docker-compose artifacts for self-host.
+2. AI Models: **(c) Emergent Universal Key + Ollama-style FREE tier simulated locally.**
+3. CrewAI Workflow: **(a) Full 7-agent app-builder crew**.
 4. Auth: **(c) Skip auth in MVP.**
-5. UI Direction: PETER AI brand — Deep Black + Champagne Gold, subtle glass-morphism with gold accents, Cormorant Garamond + Montserrat, router/agents as luxury flow diagrams. "Luxury strategist's command center" feel.
+5. UI Direction: PETER AI brand — Deep Black + Champagne Gold, glass-morphism with gold accents, Cormorant Garamond + Montserrat, luxury strategist's command center feel.
+6. Languages: EN, ID, ZH, ES, AR (with full RTL for AR).
 
 ## Architecture
-- **Frontend** `/app/frontend` — React + Tailwind + React Router + React Flow + Recharts + Framer Motion + @phosphor-icons/react.
-- **Backend** `/app/backend` — FastAPI + Motor (MongoDB) + emergentintegrations.
+- **Frontend** `/app/frontend` — React + Tailwind + React Router + React Flow + Recharts + Framer Motion + @phosphor-icons/react + react-i18next.
+- **Backend** `/app/backend` — FastAPI + Motor (MongoDB) + emergentintegrations + ChromaDB.
   - `ai_router.py` — pattern + heuristic classifier → 4 tiers (FREE/CHEAP/SMART/CRITICAL).
-  - `crew_manager.py` — sequential 7-agent orchestration built directly on emergentintegrations.
+  - `crew_manager.py` — sequential 7-agent orchestration.
+  - `script_studio.py` — Prompts 14/17/18 (script gen, eval, genius-prompt loop).
+  - `i18n.py` — Backend localisation (Accept-Language → agent roles/goals).
+  - `memory.py` — Strategist Memory (ChromaDB).
   - `server.py` — REST API surface.
-- **DB** MongoDB collections: `sessions`, `messages`, `crew_runs`.
-- **Deploy** `/app/deploy` — full docker-compose stack (Next.js-parallel + Postgres + Redis + ChromaDB + Mongo + Ollama + Nginx) for self-host parity.
 
 ## Models (preview tier mapping)
 | Tier      | Self-host                  | Preview substitute            | Provider   | $/1K   |
@@ -27,351 +29,57 @@ Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi
 | SMART     | Claude Sonnet 4.5          | claude-sonnet-4-5-20250929    | anthropic  | 0.0150 |
 | CRITICAL  | Claude Opus 4.5            | claude-opus-4-5-20251101      | anthropic  | 0.1500 |
 
-## Implemented (v5.0 · 8-Jun-2026 — Script Studio: Prompts 14 + 17 + 18)
-
-### New backend module `/app/backend/script_studio.py`
-- ✅ **`generate_script(topic, platform, style, lang, [genius_prompt])`** (Prompt 14) — produces SCENE-blocked script + hook + CTA + hashtags + duration; CHEAP tier (Haiku) for low iteration cost.
-- ✅ **`evaluate_script(script, platform)`** (Prompt 17) — SMART tier (Sonnet) returns 0-10 scores across hook/pacing/cta/value/platform_optimization, strengths + weaknesses, and 3 improved variants (A: stronger hook · B: better pacing · C: stronger CTA) with projected score deltas + recommendation.
-- ✅ **`generate_genius_prompt(topic, platform, style, target, N)`** (Prompt 18) — self-improving loop: each iteration proposes a prompt → uses it to generate a sample script → scores it → refines based on the weakest dimension. Stops on target hit, plateau (<0.2 gain), or N iterations.
-
-### New endpoints in `server.py`
-- ✅ `POST /api/script/generate` — body `{topic, platform, style, target_language, genius_prompt_id?}`; persists every run to `db.scripts`.
-- ✅ `POST /api/script/evaluate` — body `{script, platform}`; persists scores to `db.script_evaluations`.
-- ✅ `POST /api/genius-prompt/generate` — body `{topic, platform, style, target_score, iterations, save}`; persists to `db.genius_prompts` when `save=true`.
-- ✅ `GET /api/genius-prompts` — last 50, light fields.
-- ✅ `GET /api/genius-prompts/{id}` — full payload including evolution history.
-- Iteration default lowered to 1 (proxy 100s cap; 1 iter ≈ 30s, 2 ≈ 60s).
-
-### Frontend: `/studio` view
-- ✅ New sidebar nav entry (FilmStrip icon, key `nav.studio`) inserted between Crew Builder and Memory.
-- ✅ `StudioView.js`: Topic + Platform + Style + Language inputs; **Generate / Evaluate / Genius-prompt loop** action row with iteration + target-score knobs.
-- ✅ Two-column board: left → generated script (hook, scenes, hashtags) + 5-dimension score bars + strengths/weaknesses; right → 3 optimised variants with projected % improvement, recommendation card, genius-prompt panel with full prompt text + evolution history + Apply button + saved prompts library.
-- ✅ "Apply" mode chains a saved genius prompt into the next `scriptGenerate` call (badge appears on the script card).
-- ✅ Localised in all 5 locales: studio.* + nav.studio.
-
-### Verified
-- cURL: `/api/script/generate` returns hook + 6 scenes + 8 hashtags + 45s duration.
-- cURL: `/api/script/evaluate` returns scores ranging 2.0-5.5 + 3 variants + recommendation.
-- cURL: `/api/genius-prompt/generate` with `iterations=1` completes in ~30s, score 7.3, confidence 0.91, evolution history present.
-- Playwright e2e: full flow Generate → Evaluate → 3 variants rendered with scores 7.5-7.8 + recommendation text intact.
-
-
-
-### New backend module `/app/backend/i18n.py`
-- ✅ `pick_locale(header)` — parses Accept-Language, handles `en-US` → `en`, falls back to `en`.
-- ✅ `AGENT_TR` — 7 agents × 5 locales × (role, goal). Backstories + tasks stay English (LLM-facing).
-- ✅ `TIER_TR` — 4 tiers × 5 locales × (name, purpose). IDs / label / provider / model / cost / color unchanged.
-- ✅ `STATUS_TR` — pending / running / done / error labels for each locale.
-- ✅ `translate_agents()`, `translate_tier_catalog()`, `status_labels()` helpers.
-
-### Endpoint updates
-- ✅ `GET /api/agents` — accepts Accept-Language, returns translated `role`/`goal` + echoes `locale`.
-- ✅ `GET /api/tiers` — same treatment for `name`/`purpose`.
-- ✅ `GET /api/crew/runs/{id}` — agent role/goal localised for each request.
-- ✅ `GET /api/stats` — `tier_catalog` now localised.
-- ✅ New `GET /api/i18n/status` — `{labels: {pending, running, done, error}}`.
-
-### Frontend
-- ✅ `lib/api.js` axios interceptor auto-injects `Accept-Language: <i18n.language>` on every request.
-- ✅ `CrewView` re-fetches blueprint when `i18n.language` changes; status text routed through `t('crew.status<Pending|Running|Done|Error>')` in side panel + run status + past dispatches.
-- ✅ `SettingsView` re-fetches tier catalog on locale change → "Local Ollama / Ollama Lokal / 本地 Ollama / Ollama local / Ollama المحلّي" and purpose strings update live.
-- ✅ Added `chat.statusPending|Running|Done|Error` + `chat.tier` keys in all 5 locales.
-
-### Verified
-- cURL with `Accept-Language: id|zh|es|ar` returns expected translations for `/api/agents`, `/api/tiers`, `/api/i18n/status`.
-- ID Crew Builder screenshot: 7 agents in Indonesian ("Arsitek Perangkat Lunak / Insinyur DevOps / Penulis Teknis"), side panel reads "MENUNGGU / tingkat: smart / KELUARAN / Menunggu konteks sebelumnya".
-- AR Crew Builder: full RTL with مهندس البرمجيات / مطوّر الواجهة الأماميّة and "قيد الانتظار" status.
-
-
-
-### Bug fixes
-- ✅ **Crew Builder card overlap** — `AgentNode` now has a fixed 220px width with `line-clamp-2` on the goal text. Node positions widened to `(i%4)*280, floor(i/4)*200` so cards never collide on narrow embedded previews.
-- ✅ **LanguageSwitcher clipping** — in `variant="sidebar"` the dropdown now opens **upward** (`bottom-full mb-1.5`) instead of falling into the footer area. Menu also scrollable (`max-h-[260px] overflow-y-auto`) for safety. All 5 languages always reachable.
-
-### View body translations
-- ✅ Added `home / router / crew / memory / workspaces` namespaces with title + subtitle + button labels in EN / ID / ZH / ES / AR (culturally-resonant phrasing, not literal).
-- ✅ Wired into HomeView (hero title + subtitle + "Four Tiers"), RouterView (label/title/subtitle), CrewView (full header + button + Output / Thinking / Awaiting context / Run / Status / Total cost / Saved vs Premium / Recent dispatches), MemoryView (label + title), WorkspacesView (label + title + subtitle + "New workspace" button).
-
-### Still EN-only (logged to P2)
-- Backend `AGENT_BLUEPRINT` (agent role names + goals) returned from `/api/agents` — needs server-side i18n keys keyed by locale header, or a frontend mapping table.
-- Crew agent `status` enum (`pending|running|done|error`) — same upstream.
-- Past dispatches grid: requirements text (user input), timestamps.
-- Settings tier catalog body text (`purpose` field).
-
-
-
-### Backend
-- ✅ New `reply_lang` Optional[str] on the session schema; accepted via PATCH `/api/sessions/{id}` (values: `en|id|zh|es|ar`, `""` clears). Echoed by GET sessions list + GET messages.
-- ✅ New helper `apply_reply_lang(message, reply_lang)` softly appends `[User preference for THIS thread: please reply in <Lang>, even when my message is in another language. This overrides the default mirror-the-input-language behaviour for this conversation only.]` to the user's message before routing. Used by both `/api/chat` and `/api/chat/stream`.
-
-### Frontend
-- ✅ `SessionItem` now runs the same `detectLang` heuristic against the session title. When detected ≠ UI locale, a small gold `Globe` button (Phosphor) renders in the row.
-- ✅ Click opens an inline popover ([data-testid="session-translator-popover-{id}"]):
-  - Line 1: localised `chat.threadLang` — "This thread is in {{native}}."
-  - Line 2: `chat.translatorHint` — "Open in your current UI language."
-  - Gold action button: localised `chat.replyIn` — "Reply in {{ui_native}}".
-- ✅ Action triggers `setSessionReplyLang(id, uiLang)` + `loadSession(id)`. A new compact `🌐 EN` badge appears on the session row whenever `reply_lang` is set ([data-testid="session-reply-lang-badge-{id}"]).
-- ✅ Popover closes on outside click + Escape; RTL-aware via `dir={uiMeta.dir}`.
-- ✅ Translations for 6 new keys (`threadLang`, `replyIn`, `replyLangActive`, `replyLangClear`, `translatorHint`) shipped in all 5 locales.
-
-### Verified
-- `PATCH /api/sessions/{id} {"reply_lang":"en"}` ↦ Spanish-input request to `/api/chat` returns an English strategist reply (`"The risk in LATAM is structural…"`). Confirmed via cURL.
-- UI: globe button appears on the Chinese-titled session under English UI; popover renders correctly; gold reply-lang `EN` badge persists across sidebar refresh.
-
-
-
-### Detection
-- ✅ New `/app/frontend/src/lib/detectLang.js` — zero-dep heuristic detector for the 5 supported locales:
-  - Unicode script ranges win first: Han → `zh`, Arabic → `ar`.
-  - Latin fallback scored against tiny stoplists (≈20 entries each) for `id`, `es`, `en` + Spanish bonus on `¿¡ñáéíóú`.
-  - Demands ≥10 chars + ≥3 tokens + ≥2 stoplist hits + ≥1 lead over runner-up, so short noise ("hi", "test") never triggers.
-
-### UI
-- ✅ Subtle gold hairline pill appears above the textarea ([data-testid="lang-mismatch-hint"]) when detected language differs from active `i18n.language`.
-- ✅ Three pieces: Sparkle icon + localised "Looks like you're writing in {{native}} — switch the UI?" + Champagne-gold **Switch** button + dismiss `X`.
-- ✅ Dismissals are scoped per-language in component state — once the user dismisses an `es` nudge, no more `es` nudges this session.
-- ✅ One-tap switch fires `i18n.changeLanguage(detected)`; the whole UI (incl. the hint itself) re-renders in the new locale instantly.
-
-### Translations
-- ✅ `chat.didYouMean` / `chat.switchUi` / `chat.keepUi` shipped in EN / ID / ZH / ES / AR.
-
-### Verified
-- ID UI + Spanish input → ID-language hint pill → click → UI flips to ES.
-- ES UI + Arabic input → ES-language hint with native name "العربية".
-- "hi" (2 chars) → no hint. Correct: detector returns `null` below the threshold.
-
-
-
-### Per-tier savings sparkline (Cost dashboard)
-- ✅ New `GET /api/stats/sparkline?workspace_id=&days=7` — returns chronologically-ordered, zero-filled daily series per tier with `count`/`cost_usd`/`saved_usd`. Days clamp `1 ≤ n ≤ 90`.
-- ✅ Reuses the session-join workspace filter from `/api/stats`.
-- ✅ Frontend `SparklineCard` (4 cards: FREE/CHEAP/SMART/CRITICAL) — recharts mini `LineChart`, gold stroke in tier color, total saved + peak-day stats, em-dash fallback when no activity. Auto-refreshes every 6s with the rest of /cost.
-
-### Multi-language (UI + chat auto-detect)
-- ✅ `react-i18next` initialised in `/app/frontend/src/i18n/index.js` with `LanguageDetector` + `localStorage` persistence (key `peter_ai.lang`).
-- ✅ 5 locales shipped: **English**, **Bahasa Indonesia**, **中文**, **Español**, **العربية**.
-- ✅ `document.documentElement.lang` + `dir` track active language; **Arabic → RTL mirror**.
-- ✅ `<LanguageSwitcher variant="sidebar">` in sidebar bottom and `variant="settings"` on /settings as a fuller card.
-- ✅ Translated surfaces: nav labels, workspace selector, /chat header + placeholder + suggestions + memory toggle + force-tier + context-menu, /cost (all labels, scope badge, sparkline header, recent table empty state), /settings (Settings/About/Language).
-- ✅ Footer brand line stays in LTR English under every locale (deliberate brand lock with `dir="ltr"`).
-- ✅ **Chat auto-language**: `ai_router.py` system prompt now explicitly cites EN/ID/ZH/ES/AR + "Always detect the user's language … reply fluently in that exact language". Backend regression confirmed Spanish + Mandarin replies generated successfully.
-
-### Testing
-- ✅ 9/9 backend pytest in `/app/backend/tests/test_iteration3.py` (sparkline shape, day clamping, workspace filter, chat language detection).
-- ✅ Frontend verified across EN + ID + AR (Playwright DOM scan + smoke screenshots).
-
-
-
-Five prompts in user message #347 audited and closed.
-
-### Sidebar right-click context menu (Prompt 3)
-- ✅ `SessionItem` now exposes `onContextMenu` opening a fixed-position menu with **Rename** and **Delete** items + dividers.
-- ✅ Menu clamps to viewport edges; closes on Escape, click outside, or scroll.
-- ✅ Rename routes to inline editing (`session-rename-input-{id}`); Delete fires `window.confirm` and the existing DELETE flow.
-- ✅ Hover-action icons retained as redundant affordance.
-
-### Footer one-liner (Prompt 4)
-- ✅ Sidebar footer now reads exactly: **"PETER AI v4.0 — Intelligence, Elevated. Built in Indonesia."** with the centre clause in Champagne Gold (`[data-testid="sidebar-footer-brand"]`).
-- ✅ DOM scan across all 8 routes: 0 occurrences of the word "Emergent".
-
-### Markdown strict styling (Prompt 2)
-- ✅ H1 → Cormorant Garamond serif at `#C9A84C` (Champagne Gold).
-- ✅ Code blocks (inline + fenced) → solid `#0A0A0A` background with gold-tinted hairline border.
-- ✅ Tables → wrapped in `.md-table` with zebra rows (`rgba(10,15,30,0.35)` / `rgba(201,168,76,0.04)`) + gold hover; thead headers in champagne gold.
-
-### Workspace-aware Cost Dashboard (P1 add-on)
-- ✅ `GET /api/stats` now accepts `?workspace_id=<id>` (also `__none__` for untagged). Messages are scoped via the parent session join. Response echoes `workspace_id`.
-- ✅ Frontend `stats(workspace_id)` signature; `CostView` consumes `useWorkspace()` and re-fetches on workspace change.
-- ✅ New `[data-testid="cost-workspace-scope"]` badge in the header reading "Scope: All workspaces" / "Scope: {workspace name}".
-
-### Testing
-- ✅ 14/14 backend pytest in `/app/backend/tests/test_iteration2.py`.
-- ✅ Frontend UI verification 100% across footer text, Emergent-scan, context menu UX, Cost scope switch, Markdown styling.
-
-
-- ✅ **Branding sweep** — DOM scan across every page (`/`, `/chat`, `/router`, `/crew`, `/memory`, `/workspaces`, `/cost`, `/settings`) reports **zero "emergent" matches**.
-- ✅ Sidebar footer now reads: "v4.0 · The Luxury Strategist / Intelligence, Elevated. / Built in Indonesia · For the few."
-- ✅ Settings page gained an **About PETER** card: "Personal Enhanced Thinking & Execution Robot" with the full PETER AI manifesto.
-- ✅ HTML `<meta description>` + OG tags updated; FastAPI app title/description updated.
-- ✅ Code-comment cleanup in `ai_router.py` and `crew_manager.py`.
-- ✅ **Note on `EMERGENT_LLM_KEY` env var**: it is a protected platform contract required by the `emergentintegrations` SDK to function. It is NOT user-visible and cannot be renamed without losing managed-key billing. All user-facing strings now refer to it only as "managed Universal Key".
-
-### Integration test (Prompt 5)
-- TTFT **22 ms** (target < 500 ms)
-- Stats badge, sidebar (11 sessions), Workspaces (2 cards), Memory List/Graph, Export, Memory toggle — all green.
-
-## Implemented (v4.5 · 8-Jun-2026 — Backend i18n via Accept-Language)
-- ✅ New module `backend/i18n.py` with `pick_locale()` + translation tables for agents, tiers, status enum.
-- ✅ `/api/agents`, `/api/tiers`, `/api/crew/runs/{id}`, `/api/stats` localise display fields via `Accept-Language` header.
-- ✅ Frontend axios interceptor auto-injects `Accept-Language: <i18n.language>` on every request.
-- ✅ Status badges + tier names/purposes now flip with locale.
-
-
-## Implemented (v4.4 · 8-Jun-2026 — Crew/Switcher Fixes + View Body i18n)
-- ✅ Crew Builder card overlap fixed (220px width, line-clamp-2, wider node positions).
-- ✅ LanguageSwitcher dropdown opens upward in sidebar variant + scrollable.
-- ✅ View body translations: home / router / crew / memory / workspaces namespaces wired into the 5 views.
-
-
-## Implemented (v4.3 · 8-Jun-2026 — Floating Session Translator)
-- ✅ Per-session `reply_lang` override (PATCH `/api/sessions/{id}` accepts en|id|zh|es|ar).
-- ✅ `apply_reply_lang()` injects a user-preference directive into chat messages for that session.
-- ✅ Sidebar `Globe` icon on rows whose detected language ≠ UI; click opens inline popover with "Reply in {{ui_native}}" action. Persistent `🌐 EN` badge on overridden sessions.
-
-
-## Implemented (v4.2 · 8-Jun-2026 — "Did you mean…?" Language Drift Hint)
-- ✅ Zero-dep client-side detector `/app/frontend/src/lib/detectLang.js` — Unicode script ranges + stoplist scoring for 5 locales.
-- ✅ Gold hairline pill above `/chat` input ([data-testid="lang-mismatch-hint"]) when typed text language ≠ UI language. One-tap Switch / per-language dismiss.
-- ✅ Translations for `chat.didYouMean / switchUi / keepUi` in EN / ID / ZH / ES / AR.
-
-
-## Implemented (v4.1 · 8-Jun-2026 — Sparklines + Multi-Language)
-
-### Per-tier savings sparkline (Cost dashboard)
-- ✅ New `GET /api/stats/sparkline?workspace_id=&days=7` — zero-filled, day-clamped daily series per tier.
-- ✅ Frontend `SparklineCard` (4 cards) — recharts mini `LineChart`, gold stroke in tier color, total saved + peak day.
-
-### Multi-language (UI + chat auto-detect)
-- ✅ `react-i18next` initialised in `/app/frontend/src/i18n/index.js` with localStorage persistence.
-- ✅ 5 locales: English / Bahasa Indonesia / 中文 / Español / العربية.
-- ✅ `<html dir>` flips to `rtl` for Arabic; footer brand line stays LTR (brand lock).
-- ✅ `<LanguageSwitcher>` in sidebar bottom + Settings card.
-- ✅ Chat auto-language via expanded system prompt in `ai_router.py`.
-- ✅ Native-feel preset suggestions per locale (LATAM, 孙子兵法, Indonesia 2026, Gulf 2026, etc).
-
-
-## Implemented (v4.0 · 8-Jun-2026 — Message #347 closeout)
-
-Five prompts in user message #347 audited and closed.
-
-### Sidebar right-click context menu (Prompt 3)
-- ✅ `SessionItem` now exposes `onContextMenu` opening a fixed-position menu with **Rename** and **Delete** items + dividers.
-- ✅ Menu clamps to viewport edges; closes on Escape, click outside, or scroll.
-- ✅ Rename routes to inline editing (`session-rename-input-{id}`); Delete fires `window.confirm` and the existing DELETE flow.
-
-### Footer one-liner (Prompt 4)
-- ✅ Sidebar footer reads exactly: **"PETER AI v4.0 — Intelligence, Elevated. Built in Indonesia."** with the centre clause in Champagne Gold.
-- ✅ DOM scan across all 8 routes: 0 occurrences of the word "Emergent".
-
-### Markdown strict styling (Prompt 2)
-- ✅ H1 → Cormorant Garamond serif at `#C9A84C` (Champagne Gold).
-- ✅ Code blocks → solid `#0A0A0A` background with gold-tinted hairline border.
-- ✅ Tables → `.md-table` with zebra rows + gold hover; thead headers in champagne gold.
-
-### Workspace-aware Cost Dashboard (P1 add-on)
-- ✅ `GET /api/stats` accepts `?workspace_id=<id>` (also `__none__` for untagged). Messages scoped via parent session join.
-- ✅ `[data-testid="cost-workspace-scope"]` badge in the header reading "Scope: All workspaces" / "Scope: {workspace name}".
-
-
-## Implemented (v3.0 · 7-Jun-2026 — Project Workspaces & Memory Polish)
-
-Four cohesive additions; PETER is now a **portfolio of private councils**.
-
-### Project Workspaces (the big leap)
-- ✅ MongoDB collection `workspaces` with `id / name / description / color / created_at / updated_at`.
-- ✅ Every memory now carries `workspace_id` in its ChromaDB metadata (default `"global"`); every session and crew run carry `workspace_id` in Mongo.
-- ✅ React `WorkspaceProvider` context exposes `{ workspaces, active, activeId, setActive, refresh }`, persisting the active workspace in `localStorage`.
-- ✅ Sidebar gained a workspace selector with gold dot + counts, and a "Manage workspaces" deep-link.
-- ✅ New `/workspaces` page: create/edit/delete cards, color picker (5-tone gold palette), live memory/session/crew counts per workspace, soft purge confirmation.
-- ✅ Recall + extraction + memory listing + chat sessions + crew runs all transparently scope to the active workspace; "All workspaces" mode shows everything.
-- ✅ Workspace delete supports `?purge=true` to cascade-delete contents, otherwise items become untagged.
-- ✅ REST: `GET/POST/PATCH/DELETE /api/workspaces`.
-
-### Per-session memory toggle
-- ✅ New `memory_enabled` boolean on the session doc, plus PATCH support.
-- ✅ Chat header **MEMORY ON / MEMORY OFF** button: when off, no recall + no extraction for that session.
-- ✅ Hook reads `memory_enabled` when a session is reloaded so the toggle survives refresh.
-
-### Memory cluster node-graph
-- ✅ New `GET /api/memory/graph` endpoint returns memories clustered by type.
-- ✅ Memory page gained a **List / Graph** view toggle. Graph view renders type hubs (PREFERENCE / PROJECT / FACT / GOAL / THEME / NOTE) as styled React Flow nodes connected by gold hairlines to up-to-6 representative leaf memories per hub, arranged on a radial layout.
-
-### JSON export
-- ✅ New `GET /api/memory/export` returns portable JSON `{ exported_at, workspace_id, count, memories }`.
-- ✅ Memory page gained an **Export JSON** button that downloads `peter-memory-{workspace-slug}-{date}.json`.
-
-## Implemented (v2.0 · 7-Jun-2026 — Strategist Memory)
-- ✅ **ChromaDB-backed long-term recall** — new `/app/backend/memory.py` running an in-process `chromadb.PersistentClient` (cosine space, all-MiniLM-L6-v2 default embeddings) at `/app/backend/chroma_data`.
-- ✅ **Automatic extraction** — every chat turn fires a fire-and-forget Claude Haiku call that mines durable preferences / projects / facts / goals / themes / notes from the exchange and persists them. Extraction failures degrade gracefully (no chat impact).
-- ✅ **Automatic recall + injection** — before each turn the router does semantic top-5 recall (distance ≤ 0.85), builds a "What PETER remembers about you" context block and prepends it to the user message so reasoning compounds.
-- ✅ **Frontend `/memory` view** — luxury card grid grouped by type with filter chips, semantic search ("Recall"), inline "Teach PETER" manual entry with type selector, per-card delete, and a global "Forget all".
-- ✅ **In-chat indicator** — gold "N memories applied" badge in the assistant bubble; clicking opens a popover listing every recalled memory with its type chip.
-- ✅ **REST API** — `GET /api/memory`, `GET /api/memory/recall?q=…`, `POST /api/memory`, `DELETE /api/memory/{id}`, `DELETE /api/memory`.
-
-## Implemented (v1.4 · 7-Jun-2026)
-- ✅ **Blinking gold ▌ cursor** at the tail of any streaming assistant bubble (CSS `cursor-blink` keyframe in `index.css`).
-- ✅ **Stats badge reformatted** to a single compact line: `Tier: X | Tokens: Y | Cost: $Z | Time: Ns | Saved: $S` on a soft-gold `rgba(218,165,32,0.1)` background with a thin champagne border. Backend `/api/chat/stream` `done` event now emits `tokens_estimated`.
-- ✅ **TTFT < 500ms** — measured ~33ms in preview to first token.
-- ✅ **Non-blocking send** — sending while streaming queues the message (shown via "N MESSAGE(S) QUEUED" indicator) and auto-fires when the current turn completes. Stop and Queue buttons coexist while streaming.
-- ✅ **Streaming hook extracted** to `/app/frontend/src/hooks/useStreamingChat.js` (manages AbortController, TTFT, elapsed-ms).
-- ✅ **Text colour set to #E5E5E5** on chat bubbles and input.
-- ✅ **Emergent branding removed** from the app (verified via DOM scan: 0 references).
-
-## Implemented (v1.3 · 7-Jun-2026)
-- ✅ **Sidebar tier dots** — every session now shows a small coloured dot before its title (FREE=silver, CHEAP=gold-light, SMART=champagne, PREMIUM=gold-dark) with a soft glow. Auto-routed sessions show a faint neutral dot. Tooltips display "Locked tier: SMART" / "Auto-routing".
-- ✅ **Last-tier default for new sessions** — the dropdown remembers your last choice in `localStorage` (key `peter_ai.last_force_tier`) and reuses it on app load and every "+ New" click. Switching dropdown updates both the in-session record and the user-level default in one motion.
-
-## Implemented (v1.2 · 7-Jun-2026)
-- ✅ **Stop streaming** — Send button morphs into a gold-outlined Stop button while in-flight; clicks abort the fetch via the existing `AbortController`. Partial content is preserved on the bubble; UI returns to Send instantly.
-- ✅ **Per-session `force_tier` persistence** — stored on each session document in MongoDB. Restored when a session is reloaded (page refresh or sidebar select). The dropdown PATCHes `/api/sessions/{id}` immediately when changed inside a session, and `/api/chat` + `/api/chat/stream` persist the initial tier when the session is first created.
-
-## Implemented (v1.1 · 7-Jun-2026)
-- ✅ **Token-by-token SSE streaming** in chat (`/api/chat/stream` consumed via fetch+ReadableStream; live tier badge appears at first `route` event, deltas append, `done` finalises stats).
-- ✅ **Markdown rendering** for chat assistant replies and crew agent output (`react-markdown` + `remark-gfm`, fully styled with luxury theme — headings, code blocks, tables, blockquotes, lists).
-- ✅ **Session sidebar** with new / select / rename-in-place / delete (with confirm) in Chat view. Backend gained `PATCH /api/sessions/{id}` and `DELETE /api/sessions/{id}`, and the router drops in-memory LlmChat instances on session deletion.
-
-## Implemented (v1.0 · 7-Jun-2026)
-- ✅ Hero command center with live aggregated stats and tier showcase.
-- ✅ Multi-turn chat with model badge (tier, model, cost, latency, saved).
-- ✅ AI Router visualization (React Flow) with classifier → 4 tiers + active routing animation.
-- ✅ Pattern + heuristic classifier (no LLM call for routing).
-- ✅ 7-agent CrewAI orchestration with live status polling and per-agent output panel.
-- ✅ Cost & Usage dashboard: total queries, total cost, savings ledger, donut, bar chart, recent table.
-- ✅ Settings view with tier catalogue + self-host quick-start.
-- ✅ Force-tier override in chat.
-- ✅ Self-host docker-compose stack at `/app/deploy/` (Postgres + Redis + ChromaDB + Mongo + Ollama + Nginx).
-
-## Endpoints
-- `GET  /api/`                       — meta
-- `GET  /api/tiers`                  — tier catalogue
-- `GET  /api/agents`                 — crew blueprint
-- `POST /api/router/classify`        — instant classification
-- `POST /api/chat`                   — route & run a chat turn
-- `POST /api/chat/stream`            — SSE streaming variant
-- `GET  /api/sessions`               — list chat sessions
-- `GET  /api/sessions/{id}/messages` — chat history
-- `PATCH /api/sessions/{id}`         — rename session
-- `DELETE /api/sessions/{id}`        — delete session (+ messages)
-- `POST /api/crew/build`             — start 7-agent build
-- `GET  /api/crew/runs/{id}`         — poll status
-- `GET  /api/crew/runs`              — list past runs
-- `GET  /api/stats`                  — dashboard data
-
-## Backlog (P1)
-- ~~Streaming chat UI (token-by-token)~~ — done in v1.1.
-- ~~Markdown rendering in agent output and chat~~ — done in v1.1.
-- ~~Session sidebar with switch / rename / delete in Chat view~~ — done in v1.1.
-- ~~"Stop streaming" button to abort mid-flight~~ — done in v1.2.
-- ~~Persist `force_tier` per session~~ — done in v1.2.
-
-## Backlog (P2)
-- Real Ollama integration for FREE tier in preview.
-- Auth (JWT or Emergent Google Auth).
-- Token-accurate billing via provider usage payloads.
-- Export crew artifact bundle as ZIP / GitHub PR.
-- Denormalise `workspace_id` onto messages for $lookup-free cost queries at scale.
-- WorkspaceSelector: close menu on outside click.
-- React Router v7 future flags to silence migration warnings.
-- Per-session system-prompt versioning so language directives propagate to existing chats without restart.
-- Translate Workspaces, Memory, Router, Crew, Home views (currently mostly EN-only — surface translated).
-
-## Implemented (v3.1 · 7-Jun-2026 — Brand Sweep + Integration Verification)
-- ✅ Branding sweep — DOM scan across every page reports zero "emergent" matches.
-- ✅ Sidebar footer + Settings About PETER card established.
-- ✅ HTML `<meta description>` + OG tags + FastAPI app title updated.
-
-## Next Action Items
-- Iteration 8 (Script Studio MVP) closed. Foundation for Prompts 17 + 18 ready (Prompt 14 = script generation now lives on `/studio`).
-- **User verification**: `/studio` → enter topic → Generate → Evaluate → see 3 variants + scores. Optional: tap "Run genius-prompt loop" with iterations=1 (~30s) → applies a saved genius prompt to next script.
-- Skipped per scope: **Prompt 19** (revenue prediction) — needs real published-video analytics; will pick up once integrations exist.
-- P2 backlog: SSE stream for `genius-prompt/generate` so >1 iteration doesn't hit proxy 100s cap; library deletion + cross-locale prompt deduplication; per-session system-prompt versioning; React Router v7 future flags.
+## Implemented
+
+### v5.1 · Feb 2026 — Studio→Crew Handoff + Target-Language Genius Loop (THIS SESSION)
+- ✅ **Genius-Prompt target_language** — `/api/genius-prompt/generate` now accepts `target_language` and propagates through the meta-prompt engineer + sample-script gen + evaluation so the saved prompt and evolution scripts are written in the user's chosen language (verified for ID + EN heuristic).
+- ✅ **"Open in Crew" handoff** — Studio's evaluation card has `data-testid='open-in-crew-original-btn'` (gold treatment ≥8.0, secondary <8.0) + per-variant `open-in-crew-variant-{A,B,C}-btn` (rendered when projected ≥8). Click writes `localStorage.peter_ai.crew_handoff = {brief, source, topic, platform, style, at}` then navigates to `/crew`.
+- ✅ **CrewView consumer** — Lazy `useState` initializer at `CrewView.js:77-89` reads + removes the localStorage key on first paint (no `set-state-in-effect`), pre-filling the requirements textarea with the auto-composed production brief.
+- ✅ **`GET /api/genius-prompts/{id}`** now returns `language` field.
+- ✅ ESLint blocker resolved (lazy initializer pattern). Frontend compiles green.
+- ✅ Pytest backend suite: `tests/test_studio_language.py` (4/4 pass).
+- ✅ End-to-end frontend handoff test verified (iteration_4.json — 100% pass).
+
+### v5.0 · 8-Jun-2026 — Script Studio (Prompts 14 + 17 + 18)
+- ✅ `script_studio.py` module + `/api/script/generate`, `/api/script/evaluate`, `/api/genius-prompt/generate`, `GET /api/genius-prompts`, `GET /api/genius-prompts/{id}`.
+- ✅ `StudioView.js` — Topic/Platform/Style/Language inputs · Generate/Evaluate/Genius-Loop · 5-dimension score bars · 3 optimised variants · genius prompt panel with evolution + Apply.
+- ✅ Localised in 5 locales.
+
+### v4.x — i18n, Cost Dashboard, Memory
+- ✅ Multi-language UI (EN, ID, ZH, ES, AR) via react-i18next + RTL.
+- ✅ Backend i18n (`Accept-Language` → translated agent role/goal for `/api/agents`).
+- ✅ "Did you mean" drift heuristic + floating session translator.
+- ✅ Workspace-aware cost dashboard with per-tier sparklines (`/api/stats/sparkline`).
+- ✅ Strategist Memory (ChromaDB) — `/memory` view.
+
+## Roadmap
+
+### P0 — Next (recommended sequence)
+1. **SSE-stream Genius Loop** — refactor `/api/genius-prompt/generate` to stream iteration-by-iteration so iterations >1 escape the ~100s proxy timeout. Frontend StreamingFetch consumer with live progress display.
+
+### P1
+2. **Prompt 19: Revenue Prediction & Strategy** — predictive LLM analysis against historical video metrics (deferred until TikTok/IG/YouTube publishing integration lands).
+3. **Script Library Deletion UX** — delete buttons on saved scripts + genius prompts.
+
+### P2
+4. **React Hook Dependency audit** — `ChatView`, `WorkspacesView`, `MemoryView`, `CrewView`, `CostView` exhaustive-deps cleanup.
+5. **ChatView.js refactor** — break 500+ line component into smaller pieces.
+6. **A11y warnings cleanup** — `Markdown.js` jsx-a11y/heading-has-content + anchor-has-content.
+7. **React Router v7 future flags**.
+8. **Per-session system-prompt versioning**.
+9. **WorkspaceSelector outside-click close**.
+10. **"Clear override" UX on Chat session badges**.
+
+## DB schema
+- `scripts`: `{_id, topic, platform, style, language, content, hook, cta, tags, duration_sec, genius_prompt_id, created_at}`
+- `script_evaluations`: `{_id, script, platform, scores{}, overall_score, strengths, weaknesses, variants[], recommendation{}, created_at}`
+- `genius_prompts`: `{_id, topic, platform, style, language, target_score, best_iteration, expected_quality_score, genius_prompt, rationale, focus_dimensions, evolution[], confidence, created_at}`
+- `sessions`, `messages`, `crew_runs`, `workspaces`, `memories`.
+
+## 3rd-party integrations
+- OpenAI / Anthropic / Gemini — Emergent Universal LLM Key (via `emergentintegrations.llm.chat.LlmChat`).
+- ChromaDB — local vector store.
+- No external auth (MVP).
+
+## Project health
+**Green.** Backend + frontend compile clean. Lint passes. Latest test iteration (`iteration_4.json`) 100% pass on both stacks. Known cost concern: genius-prompt loop iter=1 still takes 50-110s in practice and occasionally hits the 100s proxy cap → next P0 task is SSE streaming refactor.
