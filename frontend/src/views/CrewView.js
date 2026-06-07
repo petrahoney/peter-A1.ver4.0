@@ -12,6 +12,7 @@ import { motion } from "framer-motion";
 import { CheckCircle, CircleNotch, Circle, WarningCircle } from "@phosphor-icons/react";
 import { agents as listAgents, crewBuild, crewStatus, crewList } from "../lib/api";
 import Markdown from "../components/Markdown";
+import { logErr } from "../lib/logErr";
 
 const STATUS_ICON = {
   pending: Circle,
@@ -80,8 +81,8 @@ export default function CrewView() {
   // Re-fetch the agent blueprint whenever the UI language changes so the
   // backend can return localised role + goal strings.
   useEffect(() => {
-    listAgents().then((r) => setBlueprint(r.agents)).catch(() => {});
-    crewList().then((r) => setPastRuns(r.runs)).catch(() => {});
+    listAgents().then((r) => setBlueprint(r.agents)).catch(logErr("CrewView.listAgents"));
+    crewList().then((r) => setPastRuns(r.runs)).catch(logErr("CrewView.crewList"));
   }, [i18n.language]);
 
   useEffect(() => {
@@ -96,10 +97,12 @@ export default function CrewView() {
         if (r.status === "running") {
           pollRef.current = setTimeout(poll, 1500);
         } else {
-          crewList().then((res) => setPastRuns(res.runs)).catch(() => {});
+          crewList().then((res) => setPastRuns(res.runs)).catch(logErr("CrewView.crewList"));
         }
-      } catch {
+      } catch (e) {
         if (cancelled) return;
+        // Transient network error during long-poll is expected; back off and retry.
+        console.error("[CrewView] poll error, retrying in 3s", e);
         pollRef.current = setTimeout(poll, 3000);
       }
     };

@@ -17,6 +17,7 @@ import {
 } from "recharts";
 import { stats, statsSparkline } from "../lib/api";
 import { useWorkspace } from "../context/WorkspaceContext";
+import { logErr } from "../lib/logErr";
 
 const TIER_COLORS = {
   free: "#C0C0C0",
@@ -119,8 +120,8 @@ export default function CostView() {
   const [spark, setSpark] = useState(null);
 
   const refresh = useCallback(() => {
-    stats(activeId || undefined).then(setData).catch(() => {});
-    statsSparkline(activeId || undefined, 7).then(setSpark).catch(() => {});
+    stats(activeId || undefined).then(setData).catch(logErr("CostView.stats"));
+    statsSparkline(activeId || undefined, 7).then(setSpark).catch(logErr("CostView.sparkline"));
   }, [activeId]);
 
   useEffect(() => {

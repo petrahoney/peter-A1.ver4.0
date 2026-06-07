@@ -10,6 +10,7 @@ export function WorkspaceProvider({ children }) {
     try {
       return localStorage.getItem(WS_KEY) || "";
     } catch {
+      // localStorage may be blocked (privacy mode / SSR) — fall back to empty.
       return "";
     }
   });
@@ -35,8 +36,9 @@ export function WorkspaceProvider({ children }) {
           setLoading(false);
         }, 0);
       })
-      .catch(() => {
+      .catch((e) => {
         if (cancelled) return;
+        console.error("[WorkspaceProvider] initial load failed", e);
         timer = setTimeout(() => setLoading(false), 0);
       });
     return () => {
@@ -51,7 +53,7 @@ export function WorkspaceProvider({ children }) {
       if (id) localStorage.setItem(WS_KEY, id);
       else localStorage.removeItem(WS_KEY);
     } catch {
-      /* silent */
+      // localStorage unavailable — workspace preference will not persist.
     }
   }, []);
 

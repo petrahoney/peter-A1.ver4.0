@@ -2,12 +2,13 @@ import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { tiers } from "../lib/api";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import { logErr } from "../lib/logErr";
 
 export default function SettingsView() {
   const { t: i18nT, i18n } = useTranslation();
   const [tierMap, setTierMap] = useState({});
   useEffect(() => {
-    tiers().then((r) => setTierMap(r.tiers)).catch(() => {});
+    tiers().then((r) => setTierMap(r.tiers)).catch(logErr("SettingsView.tiers"));
   }, [i18n.language]);
 
   return (

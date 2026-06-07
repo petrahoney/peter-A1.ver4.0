@@ -739,9 +739,9 @@ async def memory_create(req: MemoryCreateRequest) -> dict[str, Any]:
         item = await memory_engine.add_manual(
             req.content, req.type or "note", workspace_id=req.workspace_id
         )
+        return item
     except ValueError as e:
         raise HTTPException(400, str(e))
-    return item
 
 
 @app.delete("/api/memory/{memory_id}")

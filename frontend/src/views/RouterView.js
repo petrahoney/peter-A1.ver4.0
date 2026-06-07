@@ -10,6 +10,7 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import { motion, AnimatePresence } from "framer-motion";
 import { classify, tiers } from "../lib/api";
+import { logErr } from "../lib/logErr";
 
 const TIER_ORDER = ["free", "cheap", "smart", "critical"];
 
@@ -89,7 +90,7 @@ export default function RouterView() {
   const [classifying, setClassifying] = useState(false);
 
   useEffect(() => {
-    tiers().then((r) => setTierCatalog(r.tiers)).catch(() => {});
+    tiers().then((r) => setTierCatalog(r.tiers)).catch(logErr("RouterView.tiers"));
   }, []);
 
   const activeTier = result?.tier;

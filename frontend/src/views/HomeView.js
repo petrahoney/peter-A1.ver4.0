@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { ArrowRight, Sparkle, CurrencyDollar, Lightning } from "@phosphor-icons/react";
 import { Link } from "react-router-dom";
 import { stats, tiers } from "../lib/api";
+import { logErr } from "../lib/logErr";
 
 const HERO_BG =
   "https://images.unsplash.com/photo-1761437856376-2ce1c483343b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGx1eHVyeSUyMGRhcmslMjBnb2xkJTIwdGVjaG5vbG9neSUyMGJhY2tncm91bmR8ZW58MHx8fHwxNzgwODEyNjM4fDA&ixlib=rb-4.1.0&q=85";
@@ -24,8 +25,8 @@ export default function HomeView() {
   const [t, setT] = useState(null);
 
   useEffect(() => {
-    stats().then(setS).catch(() => {});
-    tiers().then((r) => setT(r.tiers)).catch(() => {});
+    stats().then(setS).catch(logErr("HomeView.stats"));
+    tiers().then((r) => setT(r.tiers)).catch(logErr("HomeView.tiers"));
   }, []);
 
   return (

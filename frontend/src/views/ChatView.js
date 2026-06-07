@@ -29,6 +29,7 @@ import useStreamingChat from "../hooks/useStreamingChat";
 import { useWorkspace } from "../context/WorkspaceContext";
 import { detectLang } from "../lib/detectLang";
 import { LANGUAGES } from "../i18n";
+import { logErr } from "../lib/logErr";
 
 const TIER_COLORS = {
   free: "#C0C0C0",
@@ -483,6 +484,7 @@ export default function ChatView() {
     try {
       return localStorage.getItem(LAST_TIER_KEY) || "";
     } catch {
+      // localStorage may be blocked (privacy mode / SSR) — fall back to empty.
       return "";
     }
   });
@@ -512,8 +514,8 @@ export default function ChatView() {
   }, [sessionId]);
 
   useEffect(() => {
-    tiers().then((r) => setTierCatalog(r.tiers)).catch(() => {});
-    listSessions().then((r) => setSessions(r.sessions)).catch(() => {});
+    tiers().then((r) => setTierCatalog(r.tiers)).catch(logErr("ChatView.tiers"));
+    listSessions().then((r) => setSessions(r.sessions)).catch(logErr("ChatView.listSessions"));
   }, []);
 
   useEffect(() => {
@@ -526,8 +528,8 @@ export default function ChatView() {
     try {
       const r = await listSessions(activeId || undefined);
       setSessions(r.sessions);
-    } catch {
-      /* silent */
+    } catch (e) {
+      console.error("[ChatView] refreshSessions failed", e);
     }
   }, [activeId]);
 
@@ -559,8 +561,8 @@ export default function ChatView() {
           tokens_estimated: m.tokens_estimated,
         }))
       );
-    } catch {
-      /* silent */
+    } catch (e) {
+      console.error("[ChatView] loadSession failed", e);
     }
   }, [stopStream]);
 
@@ -575,7 +577,7 @@ export default function ChatView() {
       const last = localStorage.getItem(LAST_TIER_KEY) || "";
       setForceTier(last);
     } catch {
-      /* silent */
+      // localStorage unavailable — keep current state, harmless fallback.
     }
   };
 
@@ -585,8 +587,8 @@ export default function ChatView() {
     if (sessionId) {
       try {
         await setSessionMemoryEnabled(sessionId, next);
-      } catch {
-        /* silent */
+      } catch (e) {
+        console.error("[ChatView] toggleMemory persist failed", e);
       }
     }
   };
@@ -597,15 +599,15 @@ export default function ChatView() {
       if (value) localStorage.setItem(LAST_TIER_KEY, value);
       else localStorage.removeItem(LAST_TIER_KEY);
     } catch {
-      /* silent */
+      // localStorage unavailable — preference will not persist this session.
     }
     // If we're already inside a session, persist the preference server-side.
     if (sessionId) {
       try {
         await setSessionTier(sessionId, value);
         refreshSessions();
-      } catch {
-        /* silent */
+      } catch (e) {
+        console.error("[ChatView] setSessionTier failed", e);
       }
     }
   };
@@ -629,8 +631,8 @@ export default function ChatView() {
       refreshSessions();
       // Also load the session immediately — user just opted into it.
       loadSession(id);
-    } catch {
-      /* silent */
+    } catch (e) {
+      console.error("[ChatView] applyReplyLang failed", e);
     }
   };
 
