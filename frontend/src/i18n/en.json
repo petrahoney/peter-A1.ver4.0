@@ -187,6 +187,9 @@
     "savedPrompts": "Saved genius prompts",
     "noSavedPrompts": "No genius prompts yet. Run the loop above to create one.",
     "applyPrompt": "Apply",
-    "timingHint": "1 iteration ≈ 30s · 2 iter ≈ 60s · proxy cap ≈ 100s"
+    "timingHint": "1 iteration ≈ 30s · 2 iter ≈ 60s · proxy cap ≈ 100s",
+    "openInCrew": "Open in Crew",
+    "score8Plus": "(score 8+)",
+    "crewHintBelow8": "Score 8+ unlocks production-grade hand-off. Below 8 still works — Crew will build the production checklist regardless."
   }
 }

@@ -1,14 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  Sparkle,
-  FilmStrip,
-  Lightning,
-  Star,
-  ArrowRight,
-  Brain,
-  Clock,
-} from "@phosphor-icons/react";
+import { Sparkle, FilmStrip, Lightning, Star, ArrowRight, Brain, Clock, UsersThree } from "@phosphor-icons/react";
+import { useNavigate } from "react-router-dom";
 
 import Markdown from "../components/Markdown";
 import {
@@ -64,6 +57,7 @@ function ScoreBar({ label, value }) {
 
 export default function StudioView() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [topic, setTopic] = useState("");
   const [platform, setPlatform] = useState("tiktok");
   const [style, setStyle] = useState("viral");
@@ -138,6 +132,7 @@ export default function StudioView() {
         style,
         target_score: Number(targetScore),
         iterations: Number(iterations),
+        target_language: language,
       });
       setGenius(out);
       refreshSavedPrompts();
@@ -152,6 +147,35 @@ export default function StudioView() {
     setActiveGeniusId(id);
     setGenius(savedPrompts.find((p) => p.id === id) || null);
   };
+
+  // Send a script to the Crew Builder with an auto-composed production brief.
+  // CrewView reads this hand-off key on mount and immediately pre-fills its input.
+  const sendToCrew = (scriptText, version = null) => {
+    if (!scriptText) return;
+    const briefTag = version ? `Variant ${version}` : "Original";
+    const brief =
+      `Build the production checklist + shot list + voiceover storyboard for this ${platform} ` +
+      `video script (${briefTag} · style: ${style} · language: ${language}). ` +
+      `Treat the script below as the authoritative narrative.\n\n` +
+      `TOPIC: ${topic.trim() || "(see script)"}\n` +
+      `PLATFORM: ${platform}\nSTYLE: ${style}\n\n` +
+      `=== SCRIPT ===\n${scriptText}\n=== END SCRIPT ===\n\n` +
+      `Deliver: 1) a numbered production checklist (props, locations, B-roll), ` +
+      `2) a shot list with timing for each scene, 3) voiceover storyboard with ` +
+      `pacing notes, 4) QA test plan, 5) deployment/publish runbook.`;
+    try {
+      localStorage.setItem(
+        "peter_ai.crew_handoff",
+        JSON.stringify({ brief, source: "studio", topic, platform, style, at: Date.now() }),
+      );
+    } catch (e) {
+      logErr("StudioView.sendToCrew localStorage")(e);
+    }
+    navigate("/crew");
+  };
+
+  const overallScore = Number(evaluation?.overall_score || 0);
+  const eligibleForCrew = overallScore >= 8.0;
 
   const variants = evaluation?.variants || [];
   const bestVersion = evaluation?.recommendation?.best_version;
@@ -374,6 +398,25 @@ export default function StudioView() {
                   </div>
                 </div>
               ) : null}
+              <button
+                type="button"
+                onClick={() => sendToCrew(script?.script)}
+                disabled={!script?.script}
+                data-testid="open-in-crew-original-btn"
+                title={eligibleForCrew ? "" : t("studio.crewHintBelow8")}
+                className={`mt-4 w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-md text-[10px] tracking-widest uppercase font-medium transition-all ${
+                  eligibleForCrew
+                    ? "bg-peter-gold text-peter-black hover:bg-peter-goldLight shadow-gold"
+                    : "bg-peter-navy2 border border-peter-gold/30 text-peter-gold hover:border-peter-gold/60"
+                }`}
+              >
+                <UsersThree size={12} weight="regular" />
+                {t("studio.openInCrew")}
+                {eligibleForCrew ? (
+                  <span className="text-[9px] tracking-[0.18em] opacity-80">{t("studio.score8Plus")}</span>
+                ) : null}
+                <ArrowRight size={11} weight="bold" />
+              </button>
             </div>
           ) : null}
         </div>
@@ -416,6 +459,18 @@ export default function StudioView() {
                     <div className="text-[11px] text-peter-ivory/75 leading-relaxed max-h-32 overflow-y-auto pr-1">
                       <Markdown>{v.script}</Markdown>
                     </div>
+                    {Number(v.projected_score || 0) >= 8 ? (
+                      <button
+                        type="button"
+                        onClick={() => sendToCrew(v.script, v.version)}
+                        data-testid={`open-in-crew-variant-${v.version}-btn`}
+                        className="mt-2 text-[9px] tracking-[0.24em] uppercase inline-flex items-center gap-1 text-peter-gold hover:text-peter-goldLight transition-colors"
+                      >
+                        <UsersThree size={10} weight="regular" />
+                        {t("studio.openInCrew")}
+                        <ArrowRight size={9} weight="bold" />
+                      </button>
+                    ) : null}
                   </div>
                 ))}
               </div>

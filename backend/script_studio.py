@@ -30,6 +30,14 @@ log = logging.getLogger(__name__)
 _PLATFORMS = {"tiktok", "instagram", "youtube"}
 _STYLES = {"cinematic", "viral", "educational", "avatar", "slideshow"}
 
+_REPLY_LANG_NAMES = {
+    "en": "English",
+    "id": "Bahasa Indonesia",
+    "zh": "Mandarin Chinese (中文)",
+    "es": "Spanish (Español)",
+    "ar": "Arabic (العربية)",
+}
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -217,21 +225,27 @@ async def generate_genius_prompt(
     style: str = "viral",
     target_score: float = 8.5,
     iterations: int = 3,
+    target_language: str = "en",
 ) -> dict[str, Any]:
     """Self-improving loop: generate prompt → script → evaluate → refine.
 
     Stops early when the score plateaus (<0.2 improvement) or hits target_score.
     Returns the best prompt found plus the evolution history.
+
+    The generated genius-prompt — and the sample scripts used to score it — are
+    produced in `target_language` so the loop respects the user's UI locale.
     """
     if platform not in _PLATFORMS:
         raise ValueError(f"unsupported platform: {platform}")
     iterations = max(1, min(iterations, 5))
 
+    lang_name = _REPLY_LANG_NAMES.get(target_language, "English")
     system = (
         "You are a META-PROMPT ENGINEER. You design specialised prompts that teach "
         "an AI to write higher-quality short-form video scripts. You analyse past "
         "iteration scores and refine the prompt to address the specific weaknesses. "
-        "Always return JSON only."
+        f"The prompts you produce — and the scripts they yield — must be written "
+        f"entirely in {lang_name}. Always return JSON only."
     )
 
     history: list[dict[str, Any]] = []
@@ -252,12 +266,14 @@ async def generate_genius_prompt(
 
         user = (
             f"TOPIC: {topic}\nPLATFORM: {platform}\nSTYLE: {style}\nTARGET SCORE: {target_score}\n"
+            f"OUTPUT LANGUAGE: {lang_name} (write the entire prompt in this language)\n"
             f"Iteration: {i + 1} of {iterations}.\n{prev_block}\n\n"
-            "Design ONE specialised script-writing prompt that, when given to a script "
-            "writer, will yield a script that scores >=" f"{target_score} on the standard "
-            "5-dimension rubric (hook, pacing, cta, value, platform_optimization).\n\n"
-            'Return JSON: {"prompt": str (the full optimised prompt, 6-15 lines), '
-            '"rationale": str (one sentence on what changed vs previous iteration), '
+            f"Design ONE specialised script-writing prompt — written in {lang_name} — "
+            f"that, when given to a script writer, will yield a {lang_name} script "
+            "scoring >=" f"{target_score} on the standard 5-dimension rubric "
+            "(hook, pacing, cta, value, platform_optimization).\n\n"
+            'Return JSON: {"prompt": str (the full optimised prompt, 6-15 lines, in the target language), '
+            '"rationale": str (one sentence on what changed vs previous iteration, in the target language), '
             '"focus_dimensions": [str] (which rubric dimensions this prompt boosts)}'
         )
 
@@ -269,7 +285,7 @@ async def generate_genius_prompt(
         # Evaluate the proposal by generating a sample script with it, then scoring.
         try:
             sample = await generate_script(
-                topic, platform, style=style, target_language="en",
+                topic, platform, style=style, target_language=target_language,
                 genius_prompt=proposed_prompt,
             )
             evaluation = await evaluate_script(sample.get("script", ""), platform)
@@ -314,6 +330,7 @@ async def generate_genius_prompt(
         "topic": topic,
         "platform": platform,
         "style": style,
+        "language": target_language,
         "target_score": target_score,
         "best_iteration": best["iteration"],
         "expected_quality_score": best["score"],

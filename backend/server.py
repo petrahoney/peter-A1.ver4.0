@@ -784,6 +784,7 @@ class GeniusPromptRequest(BaseModel):
     target_score: float = 8.5
     iterations: int = 1  # 1=fast (~30s), 2-3=slower but better. Proxy cap ~100s.
     save: bool = True
+    target_language: str = "en"  # locale for the prompt + sample scripts
 
 
 @app.post("/api/script/generate")
@@ -844,6 +845,7 @@ async def genius_prompt_generate(req: GeniusPromptRequest) -> dict[str, Any]:
     try:
         out = await studio_generate_genius_prompt(
             req.topic, req.platform, req.style, req.target_score, req.iterations,
+            target_language=req.target_language,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))

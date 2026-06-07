@@ -71,7 +71,22 @@ const nodeTypes = { agent: AgentNode };
 export default function CrewView() {
   const { t, i18n } = useTranslation();
   const [blueprint, setBlueprint] = useState([]);
-  const [reqs, setReqs] = useState("");
+  // Hand-off brief from Studio (or any other source) queued via localStorage.
+  // Initialised lazily so we never violate React's no-set-state-in-effect rule
+  // and the textarea is pre-filled on first paint.
+  const [reqs, setReqs] = useState(() => {
+    try {
+      const raw = localStorage.getItem("peter_ai.crew_handoff");
+      if (!raw) return "";
+      const parsed = JSON.parse(raw);
+      localStorage.removeItem("peter_ai.crew_handoff");
+      return parsed?.brief || "";
+    } catch {
+      // Corrupt JSON or blocked localStorage — fall back cleanly.
+      try { localStorage.removeItem("peter_ai.crew_handoff"); } catch { /* noop */ }
+      return "";
+    }
+  });
   const [runId, setRunId] = useState(null);
   const [run, setRun] = useState(null);
   const [selectedIdx, setSelectedIdx] = useState(0);
