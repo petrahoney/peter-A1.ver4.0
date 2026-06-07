@@ -87,7 +87,10 @@ export default function ChatView() {
     if (!input.trim() || sending) return;
     const text = input.trim();
     setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
+    setMessages((prev) => [
+      ...prev,
+      { id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, role: "user", content: text },
+    ]);
     setSending(true);
     try {
       const res = await chat(text, sessionId, forceTier || null);
@@ -95,6 +98,7 @@ export default function ChatView() {
       setMessages((prev) => [
         ...prev,
         {
+          id: res.message_id || `a-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           role: "assistant",
           content: res.response,
           tier: res.tier,
@@ -108,6 +112,7 @@ export default function ChatView() {
       setMessages((prev) => [
         ...prev,
         {
+          id: `err-${Date.now()}`,
           role: "assistant",
           content: `An error occurred: ${e?.response?.data?.detail || e.message}`,
           tier: "free",
@@ -189,7 +194,7 @@ export default function ChatView() {
             </div>
           </div>
         ) : (
-          messages.map((m, i) => <MessageBubble key={i} m={m} />)
+          messages.map((m) => <MessageBubble key={m.id} m={m} />)
         )}
         {sending ? (
           <div className="flex justify-start" data-testid="msg-loading">

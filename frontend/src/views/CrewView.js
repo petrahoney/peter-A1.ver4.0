@@ -81,9 +81,12 @@ export default function CrewView() {
 
   useEffect(() => {
     if (!runId) return;
+    let cancelled = false;
     const poll = async () => {
+      if (cancelled) return;
       try {
         const r = await crewStatus(runId);
+        if (cancelled) return;
         setRun(r);
         if (r.status === "running") {
           pollRef.current = setTimeout(poll, 1500);
@@ -91,11 +94,13 @@ export default function CrewView() {
           crewList().then((res) => setPastRuns(res.runs)).catch(() => {});
         }
       } catch {
+        if (cancelled) return;
         pollRef.current = setTimeout(poll, 3000);
       }
     };
     poll();
     return () => {
+      cancelled = true;
       if (pollRef.current) clearTimeout(pollRef.current);
     };
   }, [runId]);
