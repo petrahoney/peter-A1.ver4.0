@@ -27,7 +27,27 @@ Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi
 | SMART     | Claude Sonnet 4.5          | claude-sonnet-4-5-20250929    | anthropic  | 0.0150 |
 | CRITICAL  | Claude Opus 4.5            | claude-opus-4-5-20251101      | anthropic  | 0.1500 |
 
-## Implemented (v4.0 · 8-Jun-2026 — Message #347 closeout)
+## Implemented (v4.1 · 8-Jun-2026 — Sparklines + Multi-Language)
+
+### Per-tier savings sparkline (Cost dashboard)
+- ✅ New `GET /api/stats/sparkline?workspace_id=&days=7` — returns chronologically-ordered, zero-filled daily series per tier with `count`/`cost_usd`/`saved_usd`. Days clamp `1 ≤ n ≤ 90`.
+- ✅ Reuses the session-join workspace filter from `/api/stats`.
+- ✅ Frontend `SparklineCard` (4 cards: FREE/CHEAP/SMART/CRITICAL) — recharts mini `LineChart`, gold stroke in tier color, total saved + peak-day stats, em-dash fallback when no activity. Auto-refreshes every 6s with the rest of /cost.
+
+### Multi-language (UI + chat auto-detect)
+- ✅ `react-i18next` initialised in `/app/frontend/src/i18n/index.js` with `LanguageDetector` + `localStorage` persistence (key `peter_ai.lang`).
+- ✅ 5 locales shipped: **English**, **Bahasa Indonesia**, **中文**, **Español**, **العربية**.
+- ✅ `document.documentElement.lang` + `dir` track active language; **Arabic → RTL mirror**.
+- ✅ `<LanguageSwitcher variant="sidebar">` in sidebar bottom and `variant="settings"` on /settings as a fuller card.
+- ✅ Translated surfaces: nav labels, workspace selector, /chat header + placeholder + suggestions + memory toggle + force-tier + context-menu, /cost (all labels, scope badge, sparkline header, recent table empty state), /settings (Settings/About/Language).
+- ✅ Footer brand line stays in LTR English under every locale (deliberate brand lock with `dir="ltr"`).
+- ✅ **Chat auto-language**: `ai_router.py` system prompt now explicitly cites EN/ID/ZH/ES/AR + "Always detect the user's language … reply fluently in that exact language". Backend regression confirmed Spanish + Mandarin replies generated successfully.
+
+### Testing
+- ✅ 9/9 backend pytest in `/app/backend/tests/test_iteration3.py` (sparkline shape, day clamping, workspace filter, chat language detection).
+- ✅ Frontend verified across EN + ID + AR (Playwright DOM scan + smoke screenshots).
+
+
 
 Five prompts in user message #347 audited and closed.
 
@@ -66,6 +86,29 @@ Five prompts in user message #347 audited and closed.
 ### Integration test (Prompt 5)
 - TTFT **22 ms** (target < 500 ms)
 - Stats badge, sidebar (11 sessions), Workspaces (2 cards), Memory List/Graph, Export, Memory toggle — all green.
+
+## Implemented (v4.0 · 8-Jun-2026 — Message #347 closeout)
+
+Five prompts in user message #347 audited and closed.
+
+### Sidebar right-click context menu (Prompt 3)
+- ✅ `SessionItem` now exposes `onContextMenu` opening a fixed-position menu with **Rename** and **Delete** items + dividers.
+- ✅ Menu clamps to viewport edges; closes on Escape, click outside, or scroll.
+- ✅ Rename routes to inline editing (`session-rename-input-{id}`); Delete fires `window.confirm` and the existing DELETE flow.
+
+### Footer one-liner (Prompt 4)
+- ✅ Sidebar footer reads exactly: **"PETER AI v4.0 — Intelligence, Elevated. Built in Indonesia."** with the centre clause in Champagne Gold.
+- ✅ DOM scan across all 8 routes: 0 occurrences of the word "Emergent".
+
+### Markdown strict styling (Prompt 2)
+- ✅ H1 → Cormorant Garamond serif at `#C9A84C` (Champagne Gold).
+- ✅ Code blocks → solid `#0A0A0A` background with gold-tinted hairline border.
+- ✅ Tables → `.md-table` with zebra rows + gold hover; thead headers in champagne gold.
+
+### Workspace-aware Cost Dashboard (P1 add-on)
+- ✅ `GET /api/stats` accepts `?workspace_id=<id>` (also `__none__` for untagged). Messages scoped via parent session join.
+- ✅ `[data-testid="cost-workspace-scope"]` badge in the header reading "Scope: All workspaces" / "Scope: {workspace name}".
+
 
 ## Implemented (v3.0 · 7-Jun-2026 — Project Workspaces & Memory Polish)
 
@@ -159,13 +202,15 @@ Four cohesive additions; PETER is now a **portfolio of private councils**.
 - ~~Persist `force_tier` per session~~ — done in v1.2.
 
 ## Backlog (P2)
-- Real Ollama integration for FREE tier in preview (would require Ollama deploy).
+- Real Ollama integration for FREE tier in preview.
 - Auth (JWT or Emergent Google Auth).
-- Token-accurate billing via provider usage payloads instead of estimate.
-- Export crew artifact bundle as a ZIP / GitHub PR.
+- Token-accurate billing via provider usage payloads.
+- Export crew artifact bundle as ZIP / GitHub PR.
 - Denormalise `workspace_id` onto messages for $lookup-free cost queries at scale.
 - WorkspaceSelector: close menu on outside click.
 - React Router v7 future flags to silence migration warnings.
+- Per-session system-prompt versioning so language directives propagate to existing chats without restart.
+- Translate Workspaces, Memory, Router, Crew, Home views (currently mostly EN-only — surface translated).
 
 ## Implemented (v3.1 · 7-Jun-2026 — Brand Sweep + Integration Verification)
 - ✅ Branding sweep — DOM scan across every page reports zero "emergent" matches.
@@ -173,5 +218,5 @@ Four cohesive additions; PETER is now a **portfolio of private councils**.
 - ✅ HTML `<meta description>` + OG tags + FastAPI app title updated.
 
 ## Next Action Items
-- Iteration 2 closed (Message #347 checklist). Ready for user verification on /chat (right-click), /cost (workspace scope) and refreshed Markdown rendering.
-- Potential next: P2 backlog items above, or new feature directions from user.
+- Iteration 3 closed (Sparkline + Multi-language). Ready for user verification on /cost (4 sparkline cards) and any locale via the bottom-left switcher (try العربية for full RTL).
+- P2 backlog above; "translate remaining views" is the natural next i18n pass if user wants 100% coverage.
