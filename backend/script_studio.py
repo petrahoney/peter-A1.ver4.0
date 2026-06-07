@@ -13,13 +13,14 @@ uses CHEAP (Haiku) by default to keep iteration cost low.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, AsyncIterator, Optional
 
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 
@@ -344,3 +345,198 @@ async def generate_genius_prompt(
         "confidence": confidence,
         "created_at": _now_iso(),
     }
+
+
+# ──────────────────────────── Prompt 18 (Streaming) ────────────────────────────
+
+
+async def stream_genius_prompt(
+    topic: str,
+    platform: str,
+    style: str = "viral",
+    target_score: float = 8.5,
+    iterations: int = 3,
+    target_language: str = "en",
+) -> AsyncIterator[dict[str, Any]]:
+    """Streaming variant of generate_genius_prompt().
+
+    Yields event dicts so callers (an SSE endpoint) can forward live progress
+    to the UI. Event shapes:
+      • {"type": "start", "iterations": N, "target_score": T, "language": lang}
+      • {"type": "iter_start", "iteration": i, "total": N}
+      • {"type": "iter_done", "iteration": i, "score": S, "change": "...",
+         "weaknesses": [...], "is_best": bool}
+      • {"type": "final", "result": {... same payload as generate_genius_prompt}}
+      • {"type": "error", "message": "..."}
+
+    Escapes the ~100s proxy timeout because each iteration emits progress
+    BEFORE the next LLM round-trip starts; the proxy sees bytes flowing.
+    """
+    if platform not in _PLATFORMS:
+        yield {"type": "error", "message": f"unsupported platform: {platform}"}
+        return
+    iterations = max(1, min(iterations, 5))
+    lang_name = _REPLY_LANG_NAMES.get(target_language, "English")
+
+    yield {
+        "type": "start",
+        "iterations": iterations,
+        "target_score": target_score,
+        "language": target_language,
+        "topic": topic,
+        "platform": platform,
+        "style": style,
+    }
+
+    system = (
+        "You are a META-PROMPT ENGINEER. You design specialised prompts that teach "
+        "an AI to write higher-quality short-form video scripts. You analyse past "
+        "iteration scores and refine the prompt to address the specific weaknesses. "
+        f"The prompts you produce — and the scripts they yield — must be written "
+        f"entirely in {lang_name}. Always return JSON only."
+    )
+
+    history: list[dict[str, Any]] = []
+    best: Optional[dict[str, Any]] = None
+
+    for i in range(iterations):
+        yield {"type": "iter_start", "iteration": i + 1, "total": iterations}
+
+        prev_block = ""
+        if history:
+            prev_block = (
+                "\nPREVIOUS ITERATIONS:\n"
+                + "\n".join(
+                    f"  v{h['iteration']} score={h['score']:.2f} change=\"{h['change']}\""
+                    for h in history
+                )
+                + "\nFocus this iteration on the weakest dimension from the last evaluation:\n"
+                + json.dumps(history[-1].get("weaknesses", []), ensure_ascii=False)
+            )
+
+        user = (
+            f"TOPIC: {topic}\nPLATFORM: {platform}\nSTYLE: {style}\nTARGET SCORE: {target_score}\n"
+            f"OUTPUT LANGUAGE: {lang_name} (write the entire prompt in this language)\n"
+            f"Iteration: {i + 1} of {iterations}.\n{prev_block}\n\n"
+            f"Design ONE specialised script-writing prompt — written in {lang_name} — "
+            f"that, when given to a script writer, will yield a {lang_name} script "
+            "scoring >=" f"{target_score} on the standard 5-dimension rubric "
+            "(hook, pacing, cta, value, platform_optimization).\n\n"
+            'Return JSON: {"prompt": str (the full optimised prompt, 6-15 lines, in the target language), '
+            '"rationale": str (one sentence on what changed vs previous iteration, in the target language), '
+            '"focus_dimensions": [str] (which rubric dimensions this prompt boosts)}'
+        )
+
+        try:
+            proposal = await _ask_json(system, user, tier="smart")
+        except Exception as e:
+            log.warning("stream_genius_prompt: proposal failed iter %d: %s", i + 1, e)
+            yield {
+                "type": "iter_done",
+                "iteration": i + 1,
+                "score": 0.0,
+                "change": f"(proposal failed: {type(e).__name__})",
+                "weaknesses": [],
+                "is_best": False,
+                "skipped": True,
+            }
+            continue
+
+        proposed_prompt = proposal.get("prompt") or ""
+        if not proposed_prompt:
+            yield {
+                "type": "iter_done",
+                "iteration": i + 1,
+                "score": 0.0,
+                "change": "(empty prompt)",
+                "weaknesses": [],
+                "is_best": False,
+                "skipped": True,
+            }
+            continue
+
+        try:
+            sample = await generate_script(
+                topic, platform, style=style, target_language=target_language,
+                genius_prompt=proposed_prompt,
+            )
+            evaluation = await evaluate_script(sample.get("script", ""), platform)
+            score = float(evaluation.get("overall_score") or 0.0)
+        except Exception as e:
+            log.warning("stream_genius_prompt: eval failed iter %d: %s", i + 1, e)
+            yield {
+                "type": "iter_done",
+                "iteration": i + 1,
+                "score": 0.0,
+                "change": f"(evaluation failed: {type(e).__name__})",
+                "weaknesses": [],
+                "is_best": False,
+                "skipped": True,
+            }
+            continue
+
+        change = proposal.get("rationale") or "(no rationale)"
+        history.append({
+            "iteration": i + 1,
+            "score": round(score, 2),
+            "change": change,
+            "weaknesses": evaluation.get("weaknesses", []),
+            "prompt": proposed_prompt,
+        })
+
+        is_best = best is None or score > best["score"]
+        if is_best:
+            best = {
+                "score": round(score, 2),
+                "prompt": proposed_prompt,
+                "iteration": i + 1,
+                "rationale": change,
+                "focus_dimensions": proposal.get("focus_dimensions", []),
+            }
+
+        yield {
+            "type": "iter_done",
+            "iteration": i + 1,
+            "score": round(score, 2),
+            "change": change,
+            "weaknesses": evaluation.get("weaknesses", []),
+            "is_best": is_best,
+        }
+
+        # Yield control so the SSE writer can flush + allow proxy heartbeats.
+        await asyncio.sleep(0)
+
+        if score >= target_score:
+            break
+        if len(history) >= 2 and (history[-1]["score"] - history[-2]["score"]) < 0.2:
+            break
+
+    if best is None:
+        yield {
+            "type": "error",
+            "message": "genius-prompt loop produced no usable iteration",
+        }
+        return
+
+    confidence = min(0.95, round(best["score"] / max(target_score, 0.01), 2))
+    result = {
+        "id": uuid.uuid4().hex,
+        "topic": topic,
+        "platform": platform,
+        "style": style,
+        "language": target_language,
+        "target_score": target_score,
+        "best_iteration": best["iteration"],
+        "expected_quality_score": best["score"],
+        "genius_prompt": best["prompt"],
+        "rationale": best["rationale"],
+        "focus_dimensions": best["focus_dimensions"],
+        "evolution": [
+            {"iteration": h["iteration"], "score": h["score"], "change": h["change"]}
+            for h in history
+        ],
+        "confidence": confidence,
+        "created_at": _now_iso(),
+    }
+    yield {"type": "final", "result": result}
+

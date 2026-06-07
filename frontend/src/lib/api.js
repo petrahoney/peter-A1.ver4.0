@@ -83,8 +83,80 @@ export const scriptEvaluate = (body) =>
 export const geniusPromptGenerate = (body) =>
   api.post("/genius-prompt/generate", body, { timeout: 95000 }).then((r) => r.data);
 
+/**
+ * Streaming variant of the genius-prompt loop. Posts to /genius-prompt/stream
+ * (SSE response) and invokes `onEvent` for every parsed event from the server.
+ * Resolves with the final payload (object) once `event: end` arrives, or
+ * rejects on network failure / explicit {type:"error"} server event.
+ *
+ * @param {object} body  request body (same shape as geniusPromptGenerate)
+ * @param {function} onEvent  called for every parsed event dict
+ * @param {AbortSignal=} signal  optional abort signal
+ * @returns {Promise<object|null>} the final.result payload, or null if none
+ */
+export async function geniusPromptStream(body, onEvent, signal) {
+  const resp = await fetch(`${API}/genius-prompt/stream`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept-Language": (i18n && i18n.language) || "en",
+    },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!resp.ok || !resp.body) {
+    throw new Error(`stream HTTP ${resp.status}`);
+  }
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let buf = "";
+  let finalResult = null;
+  let serverError = null;
+
+  // SSE frames are separated by \n\n; each frame is one or more `data:` /
+  // `event:` lines. We accumulate bytes and split on the blank-line marker.
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let idx;
+    while ((idx = buf.indexOf("\n\n")) !== -1) {
+      const frame = buf.slice(0, idx);
+      buf = buf.slice(idx + 2);
+      const dataLines = frame
+        .split("\n")
+        .filter((l) => l.startsWith("data:"))
+        .map((l) => l.slice(5).trimStart());
+      if (!dataLines.length) continue;
+      const raw = dataLines.join("\n");
+      try {
+        const event = JSON.parse(raw);
+        onEvent && onEvent(event);
+        if (event.type === "final") finalResult = event.result;
+        if (event.type === "error") serverError = event.message || "stream error";
+      } catch {
+        // Ignore unparseable comments / heartbeats.
+      }
+    }
+  }
+  if (serverError) throw new Error(serverError);
+  return finalResult;
+}
+
 export const geniusPromptsList = () =>
   api.get("/genius-prompts").then((r) => r.data);
+
+export const geniusPromptDelete = (id) =>
+  api.delete(`/genius-prompts/${id}`).then((r) => r.data);
+
+export const scriptsList = () =>
+  api.get("/scripts").then((r) => r.data);
+
+export const scriptDetail = (id) =>
+  api.get(`/scripts/${id}`).then((r) => r.data);
+
+export const scriptDelete = (id) =>
+  api.delete(`/scripts/${id}`).then((r) => r.data);
 
 export const listWorkspaces = () =>
   api.get("/workspaces").then((r) => r.data);

@@ -190,6 +190,16 @@
     "timingHint": "1 iteration ≈ 30s · 2 iter ≈ 60s · proxy cap ≈ 100s",
     "openInCrew": "Open in Crew",
     "score8Plus": "(score 8+)",
-    "crewHintBelow8": "Score 8+ unlocks production-grade hand-off. Below 8 still works — Crew will build the production checklist regardless."
+    "crewHintBelow8": "Score 8+ unlocks production-grade hand-off. Below 8 still works — Crew will build the production checklist regardless.",
+    "geniusLiveStream": "Live Stream",
+    "streamWaiting": "Designing meta-prompt…",
+    "streamStarting": "Starting {{n}} iteration(s)…",
+    "streamIter": "Iteration {{i}} / {{n}}",
+    "timingHintStreaming": "Streaming · iter ≈ 30s each · proxy cap bypassed",
+    "savedScripts": "Saved scripts",
+    "deletePrompt": "Delete prompt",
+    "deleteScript": "Delete script",
+    "confirmDeletePrompt": "Delete this saved genius prompt?",
+    "confirmDeleteScript": "Delete this saved script?"
   }
 }

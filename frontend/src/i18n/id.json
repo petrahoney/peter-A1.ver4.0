@@ -190,6 +190,16 @@
     "timingHint": "1 iterasi ≈ 30 detik · 2 iter ≈ 60 detik · batas proxy ≈ 100 detik",
     "openInCrew": "Buka di Crew",
     "score8Plus": "(skor 8+)",
-    "crewHintBelow8": "Skor 8+ membuka handoff kelas produksi. Di bawah 8 tetap bisa — Crew tetap akan membuat production checklist."
+    "crewHintBelow8": "Skor 8+ membuka handoff kelas produksi. Di bawah 8 tetap bisa — Crew tetap akan membuat production checklist.",
+    "geniusLiveStream": "Streaming Langsung",
+    "streamWaiting": "Merancang meta-prompt…",
+    "streamStarting": "Memulai {{n}} iterasi…",
+    "streamIter": "Iterasi {{i}} / {{n}}",
+    "timingHintStreaming": "Streaming · ≈ 30 detik/iter · bypass batas proxy",
+    "savedScripts": "Skrip tersimpan",
+    "deletePrompt": "Hapus prompt",
+    "deleteScript": "Hapus skrip",
+    "confirmDeletePrompt": "Hapus genius prompt tersimpan ini?",
+    "confirmDeleteScript": "Hapus skrip tersimpan ini?"
   }
 }

@@ -1,0 +1,51 @@
+{
+  "summary": "Iteration 5 — tested SSE streaming for /api/genius-prompt/stream + saved-prompts/saved-scripts delete UX. RESULT: Backend SSE streaming has a CRITICAL regression — the proxy cuts the connection at ~60s before the first iter_done arrives. All Saved-Library CRUD endpoints (DELETE /api/genius-prompts/{id}, DELETE /api/scripts/{id}, GET /api/scripts, GET /api/scripts/{id}, 404 paths) work correctly. Frontend delete UX (both saved-prompts and saved-scripts cards, Trash buttons, row-click loads into Generated script) verified end-to-end via Playwright.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/genius-prompt/stream",
+        "issue": "Proxy timeout regression: SSE connection is severed ~60s after request because there is NO byte flow between the `iter_start` frame and the `iter_done` frame. During that window the backend performs 3 sequential LLM round-trips (proposal _ask_json → generate_script → evaluate_script) inside stream_genius_prompt(), each taking 15-40s. No heartbeat is emitted, so the cluster ingress idle-timeout (~60s) closes the connection. Reproduced via raw curl: only `: studio-stream-open`, `data: {type:start,...}`, and `data: {type:iter_start,...}` are received; iter_done/final/end never arrive. This defeats the entire purpose of the streaming refactor.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Live Stream UX on /studio (studio-stream-progress)",
+        "issue": "NOT TESTED in browser because backend SSE is broken upstream — the stream-progress card would render but iter_done / final events would never arrive through the proxy, leaving the UI hung on 'Iterasi 1 / 1' indefinitely. Code path itself looks correct (geniusPromptStream consumer in /app/frontend/src/lib/api.js, iterEvents/streamStatus state in StudioView.js); blocker is server-side.",
+        "affected_selectors": ["studio-stream-progress", "studio-stream-status", "stream-iter-1", "studio-genius-card"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_studio_stream_delete.py",
+    "/app/test_reports/pytest/pytest_iter5.xml"
+  ],
+  "action_items": [
+    "FIX SSE regression: in /app/backend/script_studio.py stream_genius_prompt(), emit a periodic heartbeat (every ~15s) WHILE each LLM call is in flight between iter_start and iter_done. Recommended pattern: wrap each `await _ask_json(...)` / `await generate_script(...)` / `await evaluate_script(...)` in `asyncio.create_task()`, then in a `while not task.done(): await asyncio.wait([task], timeout=15); yield {'type':'heartbeat','iteration':i+1,'phase':'proposing|drafting|evaluating'}`. Alternatively in /app/backend/server.py event_source(), yield a `: keepalive\\n\\n` comment frame every 10-15s on a separate asyncio.Task. Either approach keeps bytes flowing so the ingress idle-timer never trips.",
+    "After fix, re-run /app/backend/tests/test_studio_stream_delete.py (the 5 failing SSE tests should pass) and re-test the /studio Live Stream UX in browser."
+  ],
+  "critical_code_review_comments": [
+    "script_studio.py stream_genius_prompt() — line 458-464 has three sequential `await` calls with NO `yield` in between. This is the root cause of the proxy timeout. The `await asyncio.sleep(0)` at line 507 only runs AFTER iter_done is finally produced, so it doesn't help.",
+    "server.py event_source() correctly sets `X-Accel-Buffering: no` and `Cache-Control: no-cache, no-transform`, so the proxy WOULD flush bytes immediately — but the inner generator simply isn't yielding any bytes during the 60-90s LLM phase.",
+    "GET /api/scripts response includes language/duration_sec/hook/genius_prompt_id — all keys present and serialisable, no Mongo _id leak. ✅",
+    "DELETE endpoints return clean `{deleted:true,id:<id>}` and proper 404 on missing/already-deleted — consistent with the rest of the API. ✅",
+    "Frontend delete UX: confirm dialog fires via window.confirm (auto-accepted by page.on('dialog', d.accept)), row disappears immediately after the DELETE response — no stale cache issues. ✅",
+    "Studio UI shows a helpful badge near the Run button: '1 iteration ≈ 30s · 2 iter ≈ 60s · proxy cap = 100s' — good UX honesty, but the actual proxy cap is closer to ~60s for SSE based on this test."
+  ],
+  "updated_files": ["/app/backend/tests/test_studio_stream_delete.py (new)"],
+  "success_rate": {
+    "backend": "50% (6/12 — 5 SSE assertions failed due to proxy cutoff; 1 dependent delete test failed because final.result never arrived; Saved Scripts CRUD all pass; SSE comment-line + start frame + time_budget pass)",
+    "frontend": "Saved-library delete UX 100% (cards render, delete buttons work with confirm, rows disappear, row-click auto-populates topic/script panel). Live-Stream UX not exercised — blocked by backend SSE regression."
+  },
+  "test_credentials": "Not required (no auth).",
+  "seed_data_creation": "None. Test consumed 1 saved-script + 1 saved-prompt from existing seed data (DB still has ~6 scripts + ~9 prompts after run).",
+  "retest_needed": true,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "After main agent adds an SSE heartbeat (every 10-15s during LLM phases), re-run: REACT_APP_BACKEND_URL=$(grep REACT_APP_BACKEND_URL /app/frontend/.env | cut -d= -f2) pytest /app/backend/tests/test_studio_stream_delete.py -v --junitxml=/app/test_reports/pytest/pytest_iter6.xml. The fixture (`streamed_prompt`) is module-scoped so all 7 SSE assertions share one ~60-110s LLM run. If the heartbeat is implemented as a comment frame (`:` prefix), the test parser will correctly ignore non-`data:` lines. For frontend re-test, fill topic='Tips fokus saat WFH', set language=Bahasa Indonesia, iterations=1, click studio-genius-btn, then wait ≤180s for studio-genius-card to populate — the streaming-progress card should remain visible for the duration showing 'Iterasi 1 / 1' status.",
+  "rca of the issue": "ROOT CAUSE: stream_genius_prompt() in /app/backend/script_studio.py emits `iter_start` (line 403) then performs three sequential `await` calls totalling 60-110s before emitting `iter_done` (line 497). During that window NO bytes are written to the StreamingResponse. The Kubernetes ingress / preview-environment reverse proxy has a ~60s idle timeout for streamed responses, so the client connection is dropped before iter_done is yielded. Even though FastAPI continues running and eventually completes (backend log shows 200), the client sees a clean close after start+iter_start. REPRO: `curl -sN -X POST $URL/api/genius-prompt/stream -H 'Content-Type: application/json' -d '{\"topic\":\"...\",\"iterations\":1,\"target_language\":\"id\",\"target_score\":7.0,\"save\":false,\"platform\":\"tiktok\",\"style\":\"viral\"}'` → connection closes after ~60s with only 3 frames received. FIX: emit a heartbeat (either a SSE comment frame `: heartbeat\\n\\n` or a `{type:'heartbeat'}` data frame) every ≤15s while LLM calls are pending. The cleanest implementation is a wrapper coroutine that races the LLM `await` against an `asyncio.sleep(15)` ticker and yields heartbeats until the LLM future resolves."
+}

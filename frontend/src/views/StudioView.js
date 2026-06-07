@@ -1,14 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Sparkle, FilmStrip, Lightning, Star, ArrowRight, Brain, Clock, UsersThree } from "@phosphor-icons/react";
+import { Sparkle, FilmStrip, Lightning, Star, ArrowRight, Brain, Clock, UsersThree, Trash } from "@phosphor-icons/react";
 import { useNavigate } from "react-router-dom";
 
 import Markdown from "../components/Markdown";
 import {
   scriptGenerate,
   scriptEvaluate,
-  geniusPromptGenerate,
+  geniusPromptStream,
   geniusPromptsList,
+  geniusPromptDelete,
+  scriptsList,
+  scriptDetail,
+  scriptDelete,
 } from "../lib/api";
 import { logErr } from "../lib/logErr";
 
@@ -70,6 +74,12 @@ export default function StudioView() {
   const [evaluation, setEvaluation] = useState(null);
   const [genius, setGenius] = useState(null);
   const [savedPrompts, setSavedPrompts] = useState([]);
+  const [savedScripts, setSavedScripts] = useState([]);
+
+  // Live stream of iteration events from the SSE loop.
+  // [{iteration, score, change, weaknesses, is_best, skipped}, ...]
+  const [iterEvents, setIterEvents] = useState([]);
+  const [streamStatus, setStreamStatus] = useState(""); // "iter 2 / 3" etc.
 
   const [generating, setGenerating] = useState(false);
   const [evaluating, setEvaluating] = useState(false);
@@ -79,12 +89,58 @@ export default function StudioView() {
     geniusPromptsList()
       .then((r) => setSavedPrompts(r.items || []))
       .catch(logErr("StudioView.geniusPromptsList"));
+    scriptsList()
+      .then((r) => setSavedScripts(r.items || []))
+      .catch(logErr("StudioView.scriptsList"));
   }, []);
 
   const refreshSavedPrompts = () =>
     geniusPromptsList()
       .then((r) => setSavedPrompts(r.items || []))
       .catch(logErr("StudioView.geniusPromptsList"));
+
+  const refreshSavedScripts = () =>
+    scriptsList()
+      .then((r) => setSavedScripts(r.items || []))
+      .catch(logErr("StudioView.scriptsList"));
+
+  const handleDeletePrompt = async (id, e) => {
+    e?.stopPropagation();
+    if (!window.confirm(t("studio.confirmDeletePrompt") || "Delete this saved genius prompt?")) return;
+    try {
+      await geniusPromptDelete(id);
+      if (activeGeniusId === id) setActiveGeniusId(null);
+      if (genius?.id === id) setGenius(null);
+      refreshSavedPrompts();
+    } catch (err) {
+      logErr("StudioView.deletePrompt")(err);
+    }
+  };
+
+  const handleDeleteScript = async (id, e) => {
+    e?.stopPropagation();
+    if (!window.confirm(t("studio.confirmDeleteScript") || "Delete this saved script?")) return;
+    try {
+      await scriptDelete(id);
+      refreshSavedScripts();
+    } catch (err) {
+      logErr("StudioView.deleteScript")(err);
+    }
+  };
+
+  const handleOpenSavedScript = async (id) => {
+    try {
+      const detail = await scriptDetail(id);
+      setScript(detail);
+      setEvaluation(null);
+      setTopic(detail.topic || "");
+      if (detail.platform) setPlatform(detail.platform);
+      if (detail.style) setStyle(detail.style);
+      if (detail.language) setLanguage(detail.language);
+    } catch (err) {
+      logErr("StudioView.openSavedScript")(err);
+    }
+  };
 
   const handleGenerate = async () => {
     if (!topic.trim()) return;
@@ -100,6 +156,7 @@ export default function StudioView() {
         genius_prompt_id: activeGeniusId || undefined,
       });
       setScript(out);
+      refreshSavedScripts();
     } catch (e) {
       logErr("StudioView.generate")(e);
     } finally {
@@ -124,22 +181,41 @@ export default function StudioView() {
   const handleGenius = async () => {
     if (!topic.trim()) return;
     setGenius(null);
+    setIterEvents([]);
+    setStreamStatus("");
     setIteratingGenius(true);
     try {
-      const out = await geniusPromptGenerate({
-        topic: topic.trim(),
-        platform,
-        style,
-        target_score: Number(targetScore),
-        iterations: Number(iterations),
-        target_language: language,
-      });
-      setGenius(out);
+      const finalResult = await geniusPromptStream(
+        {
+          topic: topic.trim(),
+          platform,
+          style,
+          target_score: Number(targetScore),
+          iterations: Number(iterations),
+          target_language: language,
+        },
+        (event) => {
+          if (event.type === "start") {
+            setStreamStatus(
+              t("studio.streamStarting", { n: event.iterations }) || `Iter 0 / ${event.iterations}`,
+            );
+          } else if (event.type === "iter_start") {
+            setStreamStatus(
+              t("studio.streamIter", { i: event.iteration, n: event.total }) ||
+                `Iter ${event.iteration} / ${event.total}`,
+            );
+          } else if (event.type === "iter_done") {
+            setIterEvents((prev) => [...prev, event]);
+          }
+        },
+      );
+      if (finalResult) setGenius(finalResult);
       refreshSavedPrompts();
     } catch (e) {
       logErr("StudioView.geniusLoop")(e);
     } finally {
       setIteratingGenius(false);
+      setStreamStatus("");
     }
   };
 
@@ -295,6 +371,62 @@ export default function StudioView() {
           {t("studio.timingHint")}
         </span>
       </div>
+
+      {/* Live Stream Progress (visible during iteration) */}
+      {(iteratingGenius || iterEvents.length > 0) && (
+        <div
+          className="mt-4 p-3 rounded-md border border-peter-gold/30 bg-peter-gold/[0.04]"
+          data-testid="studio-stream-progress"
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <Lightning
+              size={12}
+              weight="fill"
+              className={iteratingGenius ? "text-peter-gold animate-pulse" : "text-peter-gold/60"}
+            />
+            <span className="text-[10px] tracking-[0.28em] uppercase text-peter-gold">
+              {t("studio.geniusLiveStream") || "Live Stream"}
+            </span>
+            {streamStatus ? (
+              <span
+                className="text-[10px] font-mono text-peter-ivory/80"
+                data-testid="studio-stream-status"
+              >
+                {streamStatus}
+              </span>
+            ) : null}
+          </div>
+          {iterEvents.length === 0 && iteratingGenius ? (
+            <div className="text-[11px] text-peter-dim/80 italic">
+              {t("studio.streamWaiting") || "Designing meta-prompt…"}
+            </div>
+          ) : null}
+          <ol className="space-y-1.5">
+            {iterEvents.map((ev) => (
+              <li
+                key={ev.iteration}
+                data-testid={`stream-iter-${ev.iteration}`}
+                className={`flex items-start gap-3 text-[11px] font-mono ${
+                  ev.is_best ? "text-peter-gold" : "text-peter-ivory/80"
+                }`}
+              >
+                <span className="tnum w-12 shrink-0">v{ev.iteration}</span>
+                <span className="tnum w-14 shrink-0">
+                  {ev.skipped ? "—" : (Number(ev.score) || 0).toFixed(1)}
+                </span>
+                {ev.is_best ? (
+                  <span className="text-[9px] tracking-widest uppercase text-peter-gold/90 px-1 border border-peter-gold/50 rounded-sm">
+                    best
+                  </span>
+                ) : null}
+                <span className="text-peter-ivory/65 leading-snug flex-1 normal-case font-light tracking-normal">
+                  {ev.change}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
 
       {/* Main board */}
       <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -564,7 +696,7 @@ export default function StudioView() {
                 {savedPrompts.map((p) => (
                   <div
                     key={p.id}
-                    className={`flex items-center justify-between p-2 rounded-sm cursor-pointer transition-colors ${
+                    className={`group flex items-center justify-between p-2 rounded-sm cursor-pointer transition-colors ${
                       activeGeniusId === p.id
                         ? "bg-peter-gold/10 border border-peter-gold/40"
                         : "hover:bg-peter-navy2/60 border border-transparent"
@@ -581,6 +713,54 @@ export default function StudioView() {
                     <div className="text-[10px] tnum text-peter-gold font-mono ml-2">
                       {Number(p.expected_quality_score || 0).toFixed(1)}
                     </div>
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeletePrompt(p.id, e)}
+                      data-testid={`delete-saved-prompt-${p.id}`}
+                      title={t("studio.deletePrompt") || "Delete"}
+                      className="ml-2 p-1 rounded-sm text-peter-dim/60 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      <Trash size={12} weight="regular" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {savedScripts.length ? (
+            <div
+              className="p-5 rounded-md border border-peter-gold/15 bg-peter-navy/40"
+              data-testid="studio-saved-scripts-card"
+            >
+              <div className="text-[10px] tracking-[0.32em] uppercase text-peter-dim mb-3">
+                {t("studio.savedScripts") || "Saved scripts"}
+              </div>
+              <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                {savedScripts.map((s) => (
+                  <div
+                    key={s.id}
+                    className="group flex items-center justify-between p-2 rounded-sm cursor-pointer hover:bg-peter-navy2/60 border border-transparent transition-colors"
+                    onClick={() => handleOpenSavedScript(s.id)}
+                    data-testid={`saved-script-${s.id}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-peter-ivory truncate">{s.topic}</div>
+                      <div className="text-[10px] font-mono text-peter-dim">
+                        {s.platform} · {s.style}
+                        {s.language ? ` · ${s.language}` : ""}
+                        {s.duration_sec ? ` · ${s.duration_sec}s` : ""}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteScript(s.id, e)}
+                      data-testid={`delete-saved-script-${s.id}`}
+                      title={t("studio.deleteScript") || "Delete"}
+                      className="ml-2 p-1 rounded-sm text-peter-dim/60 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      <Trash size={12} weight="regular" />
+                    </button>
                   </div>
                 ))}
               </div>

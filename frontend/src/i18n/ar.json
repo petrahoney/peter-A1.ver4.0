@@ -190,6 +190,16 @@
     "timingHint": "تكرار واحد ≈ ٣٠ ث · تكراران ≈ ٦٠ ث · سقف الـ proxy ≈ ١٠٠ ث",
     "openInCrew": "افتح في الفريق",
     "score8Plus": "(درجة ٨+)",
-    "crewHintBelow8": "تَفتح الدرجة ٨+ تسليمًا بمستوى الإنتاج. ما زال يعمل تحت ٨ — سيُنشئ الفريق قائمة الإنتاج بأي حال."
+    "crewHintBelow8": "تَفتح الدرجة ٨+ تسليمًا بمستوى الإنتاج. ما زال يعمل تحت ٨ — سيُنشئ الفريق قائمة الإنتاج بأي حال.",
+    "geniusLiveStream": "بث مباشر",
+    "streamWaiting": "تصميم الميتا-prompt…",
+    "streamStarting": "بدء {{n}} تكرار…",
+    "streamIter": "التكرار {{i}} / {{n}}",
+    "timingHintStreaming": "بث · ≈ ٣٠ ث لكل تكرار · تجاوز سقف الـ proxy",
+    "savedScripts": "السكربتات المحفوظة",
+    "deletePrompt": "حذف الـ prompt",
+    "deleteScript": "حذف السكربت",
+    "confirmDeletePrompt": "حذف هذا الـ Genius prompt المحفوظ؟",
+    "confirmDeleteScript": "حذف هذا السكربت المحفوظ؟"
   }
 }

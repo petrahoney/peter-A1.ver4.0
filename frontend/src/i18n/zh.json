@@ -190,6 +190,16 @@
     "timingHint": "1 次迭代 ≈ 30 秒 · 2 次 ≈ 60 秒 · 代理上限 ≈ 100 秒",
     "openInCrew": "在团队中打开",
     "score8Plus": "(8 分以上)",
-    "crewHintBelow8": "8 分以上解锁生产级交接。低于 8 分也可以使用 — 团队仍会生成生产清单。"
+    "crewHintBelow8": "8 分以上解锁生产级交接。低于 8 分也可以使用 — 团队仍会生成生产清单。",
+    "geniusLiveStream": "实时流",
+    "streamWaiting": "正在设计元提示词…",
+    "streamStarting": "开始 {{n}} 次迭代…",
+    "streamIter": "迭代 {{i}} / {{n}}",
+    "timingHintStreaming": "流式 · 每次迭代 ≈ 30 秒 · 绕过代理上限",
+    "savedScripts": "已保存的脚本",
+    "deletePrompt": "删除提示词",
+    "deleteScript": "删除脚本",
+    "confirmDeletePrompt": "删除这个已保存的天才提示词吗?",
+    "confirmDeleteScript": "删除这个已保存的脚本吗?"
   }
 }

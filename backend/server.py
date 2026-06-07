@@ -33,6 +33,7 @@ from script_studio import (
     generate_script as studio_generate_script,
     evaluate_script as studio_evaluate_script,
     generate_genius_prompt as studio_generate_genius_prompt,
+    stream_genius_prompt as studio_stream_genius_prompt,
 )
 from i18n import (
     pick_locale,
@@ -856,6 +857,61 @@ async def genius_prompt_generate(req: GeniusPromptRequest) -> dict[str, Any]:
     return out
 
 
+@app.post("/api/genius-prompt/stream")
+async def genius_prompt_stream(req: GeniusPromptRequest) -> StreamingResponse:
+    """SSE variant — emits one `data:` line per iteration so the proxy stays
+    open during long multi-iteration runs (>100s)."""
+
+    import json as _json
+
+    async def event_source() -> AsyncIterator[bytes]:
+        # Initial comment line forces an immediate flush so the client opens
+        # the EventSource as soon as the request lands.
+        yield b": studio-stream-open\n\n"
+        final_payload: Optional[dict[str, Any]] = None
+        errored = False
+        try:
+            async for event in studio_stream_genius_prompt(
+                req.topic, req.platform, req.style, req.target_score, req.iterations,
+                target_language=req.target_language,
+            ):
+                if event.get("type") == "final":
+                    final_payload = event.get("result")
+                if event.get("type") == "error":
+                    errored = True
+                yield f"data: {_json.dumps(event, ensure_ascii=False)}\n\n".encode("utf-8")
+        except Exception as e:  # network / LLM transient failure
+            errored = True
+            yield (
+                f"data: {_json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
+            ).encode("utf-8")
+
+        # Persist on the happy path only.
+        if req.save and final_payload and not errored:
+            try:
+                doc = {**final_payload, "_id": final_payload["id"]}
+                del doc["id"]
+                await db.genius_prompts.insert_one(doc)
+            except Exception as e:
+                # Surface the persistence error so the UI can warn.
+                yield (
+                    f"data: {_json.dumps({'type': 'warning', 'message': f'save_failed: {e}'}, ensure_ascii=False)}\n\n"
+                ).encode("utf-8")
+
+        # Polite SSE close.
+        yield b"event: end\ndata: {}\n\n"
+
+    return StreamingResponse(
+        event_source(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
 @app.get("/api/genius-prompts")
 async def genius_prompts_list() -> dict[str, Any]:
     cursor = db.genius_prompts.find({}, sort=[("created_at", -1)]).limit(50)
@@ -897,6 +953,64 @@ async def genius_prompt_detail(prompt_id: str) -> dict[str, Any]:
         "confidence": d.get("confidence"),
         "created_at": d.get("created_at"),
     }
+
+
+@app.delete("/api/genius-prompts/{prompt_id}")
+async def genius_prompt_delete(prompt_id: str) -> dict[str, Any]:
+    res = await db.genius_prompts.delete_one({"_id": prompt_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "not found")
+    return {"deleted": True, "id": prompt_id}
+
+
+@app.get("/api/scripts")
+async def scripts_list() -> dict[str, Any]:
+    cursor = db.scripts.find({}, sort=[("created_at", -1)]).limit(50)
+    items = []
+    async for d in cursor:
+        items.append(
+            {
+                "id": d["_id"],
+                "topic": d.get("topic"),
+                "platform": d.get("platform"),
+                "style": d.get("style"),
+                "language": d.get("language"),
+                "hook": d.get("hook"),
+                "duration_sec": d.get("duration_sec"),
+                "genius_prompt_id": d.get("genius_prompt_id"),
+                "created_at": d.get("created_at"),
+            }
+        )
+    return {"items": items}
+
+
+@app.get("/api/scripts/{script_id}")
+async def script_detail(script_id: str) -> dict[str, Any]:
+    d = await db.scripts.find_one({"_id": script_id})
+    if not d:
+        raise HTTPException(404, "not found")
+    return {
+        "id": d.get("_id"),
+        "topic": d.get("topic"),
+        "platform": d.get("platform"),
+        "style": d.get("style"),
+        "language": d.get("language"),
+        "script": d.get("script"),
+        "hook": d.get("hook"),
+        "cta": d.get("cta"),
+        "tags": d.get("tags", []),
+        "duration_sec": d.get("duration_sec"),
+        "genius_prompt_id": d.get("genius_prompt_id"),
+        "created_at": d.get("created_at"),
+    }
+
+
+@app.delete("/api/scripts/{script_id}")
+async def script_delete(script_id: str) -> dict[str, Any]:
+    res = await db.scripts.delete_one({"_id": script_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "not found")
+    return {"deleted": True, "id": script_id}
 
 
 # ───────────────────────── Project Workspaces ─────────────────────────
