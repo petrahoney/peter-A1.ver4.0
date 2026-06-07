@@ -37,7 +37,10 @@
     "suggest3": "Jelaskan AI generatif dalam tiga kalimat ringkas.",
     "rename": "Ganti Nama",
     "delete": "Hapus",
-    "confirmDelete": "Hapus \"{{title}}\"?"
+    "confirmDelete": "Hapus \"{{title}}\"?",
+    "didYouMean": "Sepertinya Anda menulis dalam {{lang}} — ganti UI?",
+    "switchUi": "Ganti",
+    "keepUi": "Biarkan"
   },
   "cost": {
     "label": "Biaya & Penggunaan",

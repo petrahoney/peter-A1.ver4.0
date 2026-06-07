@@ -37,7 +37,10 @@
     "suggest3": "Define the difference between strategy and tactics — in two lines.",
     "rename": "Rename",
     "delete": "Delete",
-    "confirmDelete": "Delete \"{{title}}\"?"
+    "confirmDelete": "Delete \"{{title}}\"?",
+    "didYouMean": "Looks like you're writing in {{lang}} — switch the UI?",
+    "switchUi": "Switch",
+    "keepUi": "Keep"
   },
   "cost": {
     "label": "Cost & Usage",

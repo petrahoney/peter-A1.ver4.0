@@ -37,7 +37,10 @@
     "suggest3": "Explica la diferencia entre estrategia y táctica en dos líneas.",
     "rename": "Renombrar",
     "delete": "Eliminar",
-    "confirmDelete": "¿Eliminar \"{{title}}\"?"
+    "confirmDelete": "¿Eliminar \"{{title}}\"?",
+    "didYouMean": "Parece que estás escribiendo en {{lang}} — ¿cambiar la interfaz?",
+    "switchUi": "Cambiar",
+    "keepUi": "Mantener"
   },
   "cost": {
     "label": "Coste y Uso",

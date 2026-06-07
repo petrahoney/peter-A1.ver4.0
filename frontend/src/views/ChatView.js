@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   PaperPlaneRight,
@@ -25,6 +25,8 @@ import {
 import Markdown from "../components/Markdown";
 import useStreamingChat from "../hooks/useStreamingChat";
 import { useWorkspace } from "../context/WorkspaceContext";
+import { detectLang } from "../lib/detectLang";
+import { LANGUAGES } from "../i18n";
 
 const TIER_COLORS = {
   free: "#C0C0C0",
@@ -380,7 +382,7 @@ function SessionItem({ s, active, onSelect, onRename, onDelete }) {
 
 export default function ChatView() {
   const { active, activeId } = useWorkspace();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sessionId, setSessionId] = useState(null);
@@ -395,10 +397,22 @@ export default function ChatView() {
   const [tierCatalog, setTierCatalog] = useState({});
   const [sessions, setSessions] = useState([]);
   const [queuedCount, setQueuedCount] = useState(0);
+  const [dismissedLangs, setDismissedLangs] = useState(() => new Set());
   const scrollerRef = useRef(null);
   const queueRef = useRef([]);
   const sessionIdRef = useRef(null);
   const { streaming, start: startStream, stop: stopStream } = useStreamingChat();
+
+  // "Did you mean…?" — detect when the input language differs from the UI.
+  // Debounced via React's render cycle; recomputes only when text or UI lang changes.
+  const detectedLang = useMemo(() => detectLang(input), [input]);
+  const langMismatchHint = useMemo(() => {
+    if (!detectedLang) return null;
+    if (detectedLang === i18n.language) return null;
+    if (dismissedLangs.has(detectedLang)) return null;
+    const meta = LANGUAGES.find((l) => l.code === detectedLang);
+    return meta ? { code: meta.code, native: meta.native } : null;
+  }, [detectedLang, i18n.language, dismissedLangs]);
 
   // Keep a ref of the live session id so the queue can use the latest value.
   useEffect(() => {
@@ -781,6 +795,42 @@ export default function ChatView() {
               className="mb-2 text-[10px] tracking-[0.3em] uppercase text-peter-gold/80"
             >
               {t("chat.queued", { count: queuedCount })}
+            </div>
+          ) : null}
+          {langMismatchHint ? (
+            <div
+              data-testid="lang-mismatch-hint"
+              className="mb-2 flex items-center gap-3 px-3 py-2 rounded-md border border-peter-gold/30 bg-peter-gold/5"
+            >
+              <Sparkle size={12} weight="fill" className="text-peter-gold shrink-0" />
+              <span className="text-[11px] text-peter-ivory/90 flex-1 font-light">
+                {t("chat.didYouMean", { lang: langMismatchHint.native })}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  i18n.changeLanguage(langMismatchHint.code);
+                }}
+                data-testid="lang-mismatch-switch"
+                className="text-[10px] tracking-widest uppercase text-peter-black bg-peter-gold hover:bg-peter-goldLight transition-colors px-3 py-1.5 rounded-sm font-medium"
+              >
+                {t("chat.switchUi")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDismissedLangs((prev) => {
+                    const next = new Set(prev);
+                    next.add(langMismatchHint.code);
+                    return next;
+                  });
+                }}
+                data-testid="lang-mismatch-dismiss"
+                className="text-peter-dim hover:text-peter-ivory p-1 transition-colors"
+                aria-label="Dismiss"
+              >
+                <X size={12} weight="bold" />
+              </button>
             </div>
           ) : null}
           <div className="flex gap-3 items-end">

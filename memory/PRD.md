@@ -27,7 +27,29 @@ Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi
 | SMART     | Claude Sonnet 4.5          | claude-sonnet-4-5-20250929    | anthropic  | 0.0150 |
 | CRITICAL  | Claude Opus 4.5            | claude-opus-4-5-20251101      | anthropic  | 0.1500 |
 
-## Implemented (v4.1 · 8-Jun-2026 — Sparklines + Multi-Language)
+## Implemented (v4.2 · 8-Jun-2026 — "Did you mean…?" Language Drift Hint)
+
+### Detection
+- ✅ New `/app/frontend/src/lib/detectLang.js` — zero-dep heuristic detector for the 5 supported locales:
+  - Unicode script ranges win first: Han → `zh`, Arabic → `ar`.
+  - Latin fallback scored against tiny stoplists (≈20 entries each) for `id`, `es`, `en` + Spanish bonus on `¿¡ñáéíóú`.
+  - Demands ≥10 chars + ≥3 tokens + ≥2 stoplist hits + ≥1 lead over runner-up, so short noise ("hi", "test") never triggers.
+
+### UI
+- ✅ Subtle gold hairline pill appears above the textarea ([data-testid="lang-mismatch-hint"]) when detected language differs from active `i18n.language`.
+- ✅ Three pieces: Sparkle icon + localised "Looks like you're writing in {{native}} — switch the UI?" + Champagne-gold **Switch** button + dismiss `X`.
+- ✅ Dismissals are scoped per-language in component state — once the user dismisses an `es` nudge, no more `es` nudges this session.
+- ✅ One-tap switch fires `i18n.changeLanguage(detected)`; the whole UI (incl. the hint itself) re-renders in the new locale instantly.
+
+### Translations
+- ✅ `chat.didYouMean` / `chat.switchUi` / `chat.keepUi` shipped in EN / ID / ZH / ES / AR.
+
+### Verified
+- ID UI + Spanish input → ID-language hint pill → click → UI flips to ES.
+- ES UI + Arabic input → ES-language hint with native name "العربية".
+- "hi" (2 chars) → no hint. Correct: detector returns `null` below the threshold.
+
+
 
 ### Per-tier savings sparkline (Cost dashboard)
 - ✅ New `GET /api/stats/sparkline?workspace_id=&days=7` — returns chronologically-ordered, zero-filled daily series per tier with `count`/`cost_usd`/`saved_usd`. Days clamp `1 ≤ n ≤ 90`.
@@ -86,6 +108,21 @@ Five prompts in user message #347 audited and closed.
 ### Integration test (Prompt 5)
 - TTFT **22 ms** (target < 500 ms)
 - Stats badge, sidebar (11 sessions), Workspaces (2 cards), Memory List/Graph, Export, Memory toggle — all green.
+
+## Implemented (v4.1 · 8-Jun-2026 — Sparklines + Multi-Language)
+
+### Per-tier savings sparkline (Cost dashboard)
+- ✅ New `GET /api/stats/sparkline?workspace_id=&days=7` — zero-filled, day-clamped daily series per tier.
+- ✅ Frontend `SparklineCard` (4 cards) — recharts mini `LineChart`, gold stroke in tier color, total saved + peak day.
+
+### Multi-language (UI + chat auto-detect)
+- ✅ `react-i18next` initialised in `/app/frontend/src/i18n/index.js` with localStorage persistence.
+- ✅ 5 locales: English / Bahasa Indonesia / 中文 / Español / العربية.
+- ✅ `<html dir>` flips to `rtl` for Arabic; footer brand line stays LTR (brand lock).
+- ✅ `<LanguageSwitcher>` in sidebar bottom + Settings card.
+- ✅ Chat auto-language via expanded system prompt in `ai_router.py`.
+- ✅ Native-feel preset suggestions per locale (LATAM, 孙子兵法, Indonesia 2026, Gulf 2026, etc).
+
 
 ## Implemented (v4.0 · 8-Jun-2026 — Message #347 closeout)
 
@@ -218,10 +255,5 @@ Four cohesive additions; PETER is now a **portfolio of private councils**.
 - ✅ HTML `<meta description>` + OG tags + FastAPI app title updated.
 
 ## Next Action Items
-- Iteration 3.1 closed (native preset suggestions per locale). Try `/chat` empty state under each language — prompts now feel native, not translated:
-  - **EN**: "Analyze the strategic risk of expanding into Europe in 2026."
-  - **ID**: "Apa peluang strategis pasar Indonesia di 2026?"
-  - **ZH**: "什么是《孙子兵法》中的「势」?"
-  - **ES**: "Define la estrategia de expansión en LATAM para 2026."
-  - **AR**: "ما الفرص الاستراتيجية في دول الخليج لعام 2026؟"
-- P2 backlog above; translating Home / Router / Crew / Memory / Workspaces body copy is the natural next sweep.
+- Iteration 4 closed ("Did you mean…?" hint). Ready for user verification: type a non-UI-language prompt in `/chat`, watch the gold pill appear, one-tap switch.
+- P2 backlog: translate body copy of Home / Router / Crew / Memory / Workspaces; per-session system-prompt versioning; WorkspaceSelector outside-click close; React Router v7 future flags.

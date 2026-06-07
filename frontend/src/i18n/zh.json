@@ -37,7 +37,10 @@
     "suggest3": "什么是《孙子兵法》中的「势」?",
     "rename": "重命名",
     "delete": "删除",
-    "confirmDelete": "删除「{{title}}」?"
+    "confirmDelete": "删除「{{title}}」?",
+    "didYouMean": "您似乎在用{{lang}}书写 — 切换界面语言?",
+    "switchUi": "切换",
+    "keepUi": "保留"
   },
   "cost": {
     "label": "成本与用量",
