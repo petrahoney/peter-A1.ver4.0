@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   PieChart,
   Pie,
@@ -13,6 +13,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { stats } from "../lib/api";
+import { useWorkspace } from "../context/WorkspaceContext";
 
 const TIER_COLORS = {
   free: "#C0C0C0",
@@ -37,15 +38,18 @@ function Big({ label, value, sub, testid }) {
 }
 
 export default function CostView() {
+  const { active, activeId } = useWorkspace();
   const [data, setData] = useState(null);
 
-  const refresh = () => stats().then(setData).catch(() => {});
+  const refresh = useCallback(() => {
+    stats(activeId || undefined).then(setData).catch(() => {});
+  }, [activeId]);
 
   useEffect(() => {
     refresh();
     const id = setInterval(refresh, 6000);
     return () => clearInterval(id);
-  }, []);
+  }, [refresh]);
 
   if (!data) {
     return (
@@ -73,9 +77,26 @@ export default function CostView() {
       <div className="text-[11px] tracking-[0.32em] uppercase text-peter-dim">
         Cost & Usage
       </div>
-      <h1 className="h-display text-4xl text-peter-ivory mt-1">
-        The savings <em className="text-peter-gold not-italic">ledger</em>
-      </h1>
+      <div className="flex items-end justify-between flex-wrap gap-4">
+        <h1 className="h-display text-4xl text-peter-ivory mt-1">
+          The savings <em className="text-peter-gold not-italic">ledger</em>
+        </h1>
+        <div
+          data-testid="cost-workspace-scope"
+          className="text-[10px] tracking-[0.28em] uppercase inline-flex items-center gap-2 px-3 py-1.5 rounded-md border"
+          style={{
+            color: active ? active.color || "#C9A84C" : "#C9A84C",
+            borderColor: "rgba(201,168,76,0.25)",
+            background: "rgba(201,168,76,0.06)",
+          }}
+        >
+          <span
+            className="w-1.5 h-1.5 rounded-full"
+            style={{ background: active ? active.color || "#C9A84C" : "#C9A84C" }}
+          />
+          Scope: {active ? active.name : "All workspaces"}
+        </div>
+      </div>
 
       <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-4">
         <Big

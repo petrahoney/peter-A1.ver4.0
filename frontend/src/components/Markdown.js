@@ -3,12 +3,26 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 // Luxury-themed markdown renderer for chat + crew agent output.
+// H1 → Cormorant Garamond + Champagne Gold (display heading).
+// Code blocks → solid dark surface (#0A0A0A).
+// Tables → zebra-striped rows for legibility.
 const components = {
   h1: (p) => (
-    <h1 className="h-display text-2xl text-peter-ivory mt-3 mb-2" {...p} />
+    <h1
+      className="h-display text-3xl mt-4 mb-3 tracking-tight"
+      style={{
+        fontFamily: "'Cormorant Garamond', serif",
+        color: "#C9A84C",
+      }}
+      {...p}
+    />
   ),
   h2: (p) => (
-    <h2 className="h-display text-xl text-peter-ivory mt-3 mb-2" {...p} />
+    <h2
+      className="h-display text-2xl text-peter-ivory mt-4 mb-2"
+      style={{ fontFamily: "'Cormorant Garamond', serif" }}
+      {...p}
+    />
   ),
   h3: (p) => (
     <h3 className="text-base font-medium text-peter-goldLight mt-3 mb-1 tracking-wide" {...p} />
@@ -41,7 +55,8 @@ const components = {
     if (inline) {
       return (
         <code
-          className="px-1.5 py-0.5 rounded bg-peter-black/60 border border-peter-gold/15 text-peter-goldLight text-[0.9em] font-mono"
+          className="px-1.5 py-0.5 rounded border border-peter-gold/15 text-peter-goldLight text-[0.9em] font-mono"
+          style={{ backgroundColor: "#0A0A0A" }}
           {...props}
         >
           {children}
@@ -49,7 +64,10 @@ const components = {
       );
     }
     return (
-      <pre className="my-3 p-4 rounded-md bg-peter-black/70 border border-peter-gold/15 overflow-x-auto">
+      <pre
+        className="my-3 p-4 rounded-md border border-peter-gold/15 overflow-x-auto"
+        style={{ backgroundColor: "#0A0A0A" }}
+      >
         <code className="text-xs font-mono text-peter-ivory/90 leading-relaxed" {...props}>
           {children}
         </code>
@@ -57,14 +75,14 @@ const components = {
     );
   },
   table: (p) => (
-    <div className="my-3 overflow-x-auto">
-      <table className="w-full text-xs border border-peter-gold/15" {...p} />
+    <div className="my-3 overflow-x-auto rounded-md border border-peter-gold/15">
+      <table className="w-full text-xs md-table" {...p} />
     </div>
   ),
-  thead: (p) => <thead className="bg-peter-navy2/60" {...p} />,
+  thead: (p) => <thead className="bg-peter-navy2/70" {...p} />,
   th: (p) => (
     <th
-      className="text-left px-3 py-2 border-b border-peter-gold/15 text-peter-dim uppercase tracking-widest text-[10px]"
+      className="text-left px-3 py-2 border-b border-peter-gold/20 text-peter-gold uppercase tracking-widest text-[10px]"
       {...p}
     />
   ),

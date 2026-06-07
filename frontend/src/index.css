@@ -132,3 +132,61 @@ body {
 *::-webkit-scrollbar-thumb:hover {
   background: rgba(201, 168, 76, 0.4);
 }
+
+/* Markdown tables — luxury zebra striping */
+.md-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.md-table tbody tr:nth-child(odd) {
+  background: rgba(10, 15, 30, 0.35);
+}
+.md-table tbody tr:nth-child(even) {
+  background: rgba(201, 168, 76, 0.04);
+}
+.md-table tbody tr:hover {
+  background: rgba(201, 168, 76, 0.09);
+}
+
+/* Right-click context menu */
+.peter-context-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 168px;
+  background: #0A0F1E;
+  border: 1px solid rgba(201, 168, 76, 0.35);
+  border-radius: 6px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(201, 168, 76, 0.08);
+  padding: 4px;
+  backdrop-filter: blur(12px);
+}
+.peter-context-menu button {
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: #E5E5E5;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.peter-context-menu button:hover {
+  background: rgba(201, 168, 76, 0.12);
+  color: #C9A84C;
+}
+.peter-context-menu button.danger:hover {
+  background: rgba(220, 80, 80, 0.12);
+  color: #ff6b6b;
+}
+.peter-context-menu .divider {
+  height: 1px;
+  background: rgba(201, 168, 76, 0.15);
+  margin: 3px 4px;
+}
+

@@ -160,14 +160,11 @@ function Sidebar() {
 
       <div className="px-7 pb-7">
         <div className="hairline mb-4" />
-        <div className="text-[10px] tracking-[0.32em] uppercase text-peter-dim">
-          v4.0 · The Luxury Strategist
-        </div>
-        <div className="mt-1 text-xs text-peter-dim/70 font-light">
-          Intelligence, Elevated.
-        </div>
-        <div className="mt-1 text-[10px] text-peter-dim/60 font-light">
-          Built in Indonesia · For the few.
+        <div
+          data-testid="sidebar-footer-brand"
+          className="text-[10px] tracking-[0.22em] text-peter-dim/80 font-light leading-snug"
+        >
+          PETER AI v4.0 — <span className="text-peter-gold">Intelligence, Elevated.</span> Built in Indonesia.
         </div>
       </div>
     </aside>

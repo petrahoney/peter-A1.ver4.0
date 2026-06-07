@@ -205,6 +205,7 @@ function MessageBubble({ m, streaming }) {
 function SessionItem({ s, active, onSelect, onRename, onDelete }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(s.title || "Untitled");
+  const [menu, setMenu] = useState(null); // {x, y} when right-click menu is open
 
   const commit = async () => {
     const t = title.trim();
@@ -212,9 +213,38 @@ function SessionItem({ s, active, onSelect, onRename, onDelete }) {
     setEditing(false);
   };
 
+  const openMenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (editing) return;
+    // Clamp to viewport so menu never spills off-screen
+    const w = 180;
+    const h = 92;
+    const x = Math.min(e.clientX, window.innerWidth - w - 8);
+    const y = Math.min(e.clientY, window.innerHeight - h - 8);
+    setMenu({ x, y });
+  };
+
+  const closeMenu = () => setMenu(null);
+
+  useEffect(() => {
+    if (!menu) return undefined;
+    const onDown = () => closeMenu();
+    const onKey = (e) => e.key === "Escape" && closeMenu();
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("scroll", closeMenu, true);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("scroll", closeMenu, true);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [menu]);
+
   return (
     <div
       onClick={() => !editing && onSelect(s.id)}
+      onContextMenu={openMenu}
       className={[
         "group px-3 py-2.5 rounded-md cursor-pointer transition-colors border",
         active
@@ -306,6 +336,42 @@ function SessionItem({ s, active, onSelect, onRename, onDelete }) {
           </div>
         </div>
       )}
+      {menu ? (
+        <div
+          className="peter-context-menu"
+          style={{ top: menu.y, left: menu.x }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          role="menu"
+          data-testid={`session-context-menu-${s.id}`}
+        >
+          <button
+            type="button"
+            data-testid={`session-context-rename-${s.id}`}
+            onClick={() => {
+              closeMenu();
+              setEditing(true);
+            }}
+          >
+            <PencilSimple size={12} weight="regular" />
+            Rename
+          </button>
+          <div className="divider" />
+          <button
+            type="button"
+            className="danger"
+            data-testid={`session-context-delete-${s.id}`}
+            onClick={() => {
+              closeMenu();
+              if (window.confirm(`Delete "${s.title || "this session"}"?`))
+                onDelete(s.id);
+            }}
+          >
+            <Trash size={12} weight="regular" />
+            Delete
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

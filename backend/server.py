@@ -417,9 +417,21 @@ async def crew_list(workspace_id: Optional[str] = None) -> dict[str, Any]:
 
 
 @app.get("/api/stats")
-async def stats() -> dict[str, Any]:
+async def stats(workspace_id: Optional[str] = None) -> dict[str, Any]:
+    # Workspace scoping: messages don't carry workspace_id directly, so we
+    # resolve via sessions. Special value "__none__" → untagged sessions.
+    match_stage: dict[str, Any] = {"role": "assistant"}
+    if workspace_id:
+        ws_query: dict[str, Any] = {}
+        if workspace_id == "__none__":
+            ws_query["workspace_id"] = {"$in": [None, ""]}
+        else:
+            ws_query["workspace_id"] = workspace_id
+        session_ids = [s["_id"] async for s in db.sessions.find(ws_query, {"_id": 1})]
+        match_stage["session_id"] = {"$in": session_ids}
+
     pipeline_tier = [
-        {"$match": {"role": "assistant"}},
+        {"$match": match_stage},
         {
             "$group": {
                 "_id": "$tier",
@@ -458,9 +470,12 @@ async def stats() -> dict[str, Any]:
     totals["total_cost_usd"] = round(totals["total_cost_usd"], 6)
     totals["total_saved_usd"] = round(totals["total_saved_usd"], 6)
 
-    # Recent queries (last 15)
+    # Recent queries (last 15) — same workspace filter
+    recent_query: dict[str, Any] = {"role": "assistant"}
+    if workspace_id:
+        recent_query["session_id"] = match_stage["session_id"]
     recent_cursor = db.messages.find(
-        {"role": "assistant"}, sort=[("created_at", -1)]
+        recent_query, sort=[("created_at", -1)]
     ).limit(15)
     recent: list[dict[str, Any]] = []
     async for m in recent_cursor:
@@ -482,6 +497,7 @@ async def stats() -> dict[str, Any]:
         "tier_breakdown": tier_breakdown,
         "recent": recent,
         "tier_catalog": TIER_CATALOG,
+        "workspace_id": workspace_id,
     }
 
 

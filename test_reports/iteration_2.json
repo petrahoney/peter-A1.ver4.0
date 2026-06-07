@@ -1,0 +1,52 @@
+{
+  "summary": "Iteration 2 — Message #347 closeout (footer brand, right-click context menu, workspace-scoped Cost Dashboard, tightened markdown styling). 13/14 backend pytest cases pass on first run; 1 streaming test was a test-harness bug (SSE 'event:' lines parsed, not JSON 'type'), fixed and now 14/14 pass. All 5 critical frontend UI checks pass — sidebar footer text exact match, zero 'Emergent' string occurrences across all 8 routes, right-click context menu (rename/delete + Escape close + inline rename), Cost workspace-scope badge default + live update on workspace switch, Markdown H1 in Cormorant Garamond #C9A84C + .md-table zebra striping confirmed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration2.py",
+    "/app/backend/tests/test_peter_ai.py",
+    "/app/test_reports/pytest/pytest_iter2.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Backend GET /api/stats workspace filter is correct: messages don't carry workspace_id natively, so resolution goes via session lookup (server.py:430). Slight performance note: for very large workspaces this materializes all session_ids in-memory before the $in match — fine for MVP, but consider an aggregation $lookup or denormalising workspace_id onto messages if traffic grows.",
+    "ChatView.js openMenu uses fixed hardcoded width/height (180×92) to clamp menu to viewport (lines 222-224). If menu content changes, clamping will drift. Minor — acceptable for MVP.",
+    "React Router v7 warnings on every navigation (v7_startTransition, v7_relativeSplatPath). Non-functional, but adding future flags would silence them.",
+    "WorkspaceSelector menu opens on click and closes only on mouseLeave/option-click — clicking outside the menu but inside the page does not close it. Minor UX nit."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration2.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (14/14 pytest tests)",
+    "frontend": "100% (footer/Emergent-scan/context-menu/cost-scope/markdown all verified)"
+  },
+  "test_credentials": "Not required (no auth in MVP)",
+  "seed_data_creation": "Created via test runs: several TEST_-prefixed sessions and one TEST_iter2 workspace (auto-purged on teardown). Two preexisting workspaces ('PETER AI v5 roadmap' + another) were used for the Cost scope switch validation.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run with: REACT_APP_BACKEND_URL=$(grep REACT_APP_BACKEND_URL /app/frontend/.env | cut -d= -f2) pytest /app/backend/tests/ -v. test_iteration2.py covers the Message #347 checklist (stats?workspace_id=, session rename/delete, SSE event stream parsed correctly, memory regression). For SSE parsing note: server emits 'event: X\\ndata: {...}' standard SSE format — parse the event: line for the type, not a JSON .type field.",
+  "verified_against_spec": {
+    "footer_exact_text": "PETER AI v4.0 — Intelligence, Elevated. Built in Indonesia. ✓",
+    "emergent_word_occurrences": "0 across /, /chat, /router, /crew, /memory, /workspaces, /cost, /settings ✓",
+    "context_menu_rename_testid": "session-context-rename-{id} ✓",
+    "context_menu_delete_testid": "session-context-delete-{id} ✓",
+    "rename_inline_input_testid": "session-rename-input-{id} ✓",
+    "escape_closes_context_menu": true,
+    "stats_workspace_id_filter": "workspace_id=<id>, __none__, and unknown all return correct shape with workspace_id echoed ✓",
+    "stats_response_shape": "totals, tier_breakdown, recent, tier_catalog, workspace_id ✓",
+    "cost_workspace_scope_default": "Scope: All workspaces ✓",
+    "cost_workspace_scope_switch": "Updates immediately on selector change (verified: 'Scope: PETER AI v5 roadmap') ✓",
+    "markdown_h1_font": "Cormorant Garamond, serif ✓",
+    "markdown_h1_color": "rgb(201, 168, 76) — champagne gold ✓",
+    "markdown_table_zebra": "alternating row backgrounds (rgba(10,15,30,0.35) vs rgba(201,168,76,0.04)) ✓",
+    "streaming_sse_events": "route → delta → done, TTFT < 5s, done includes tokens_estimated/cost_usd/saved_usd ✓"
+  }
+}

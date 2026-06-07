@@ -10,7 +10,10 @@ export const api = axios.create({
 
 export const tiers = () => api.get("/tiers").then((r) => r.data);
 export const agents = () => api.get("/agents").then((r) => r.data);
-export const stats = () => api.get("/stats").then((r) => r.data);
+export const stats = (workspace_id) => {
+  const q = workspace_id ? `?workspace_id=${encodeURIComponent(workspace_id)}` : "";
+  return api.get(`/stats${q}`).then((r) => r.data);
+};
 
 export const classify = (query) =>
   api.post("/router/classify", { query }).then((r) => r.data);
