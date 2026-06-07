@@ -27,7 +27,34 @@ Build "PETER AI" — a Jarvis-class AI assistant platform with intelligent multi
 | SMART     | Claude Sonnet 4.5          | claude-sonnet-4-5-20250929    | anthropic  | 0.0150 |
 | CRITICAL  | Claude Opus 4.5            | claude-opus-4-5-20251101      | anthropic  | 0.1500 |
 
-## Implemented (v4.4 · 8-Jun-2026 — Crew/Switcher Fixes + View Body i18n)
+## Implemented (v4.5 · 8-Jun-2026 — Backend i18n via Accept-Language)
+
+### New backend module `/app/backend/i18n.py`
+- ✅ `pick_locale(header)` — parses Accept-Language, handles `en-US` → `en`, falls back to `en`.
+- ✅ `AGENT_TR` — 7 agents × 5 locales × (role, goal). Backstories + tasks stay English (LLM-facing).
+- ✅ `TIER_TR` — 4 tiers × 5 locales × (name, purpose). IDs / label / provider / model / cost / color unchanged.
+- ✅ `STATUS_TR` — pending / running / done / error labels for each locale.
+- ✅ `translate_agents()`, `translate_tier_catalog()`, `status_labels()` helpers.
+
+### Endpoint updates
+- ✅ `GET /api/agents` — accepts Accept-Language, returns translated `role`/`goal` + echoes `locale`.
+- ✅ `GET /api/tiers` — same treatment for `name`/`purpose`.
+- ✅ `GET /api/crew/runs/{id}` — agent role/goal localised for each request.
+- ✅ `GET /api/stats` — `tier_catalog` now localised.
+- ✅ New `GET /api/i18n/status` — `{labels: {pending, running, done, error}}`.
+
+### Frontend
+- ✅ `lib/api.js` axios interceptor auto-injects `Accept-Language: <i18n.language>` on every request.
+- ✅ `CrewView` re-fetches blueprint when `i18n.language` changes; status text routed through `t('crew.status<Pending|Running|Done|Error>')` in side panel + run status + past dispatches.
+- ✅ `SettingsView` re-fetches tier catalog on locale change → "Local Ollama / Ollama Lokal / 本地 Ollama / Ollama local / Ollama المحلّي" and purpose strings update live.
+- ✅ Added `chat.statusPending|Running|Done|Error` + `chat.tier` keys in all 5 locales.
+
+### Verified
+- cURL with `Accept-Language: id|zh|es|ar` returns expected translations for `/api/agents`, `/api/tiers`, `/api/i18n/status`.
+- ID Crew Builder screenshot: 7 agents in Indonesian ("Arsitek Perangkat Lunak / Insinyur DevOps / Penulis Teknis"), side panel reads "MENUNGGU / tingkat: smart / KELUARAN / Menunggu konteks sebelumnya".
+- AR Crew Builder: full RTL with مهندس البرمجيات / مطوّر الواجهة الأماميّة and "قيد الانتظار" status.
+
+
 
 ### Bug fixes
 - ✅ **Crew Builder card overlap** — `AgentNode` now has a fixed 220px width with `line-clamp-2` on the goal text. Node positions widened to `(i%4)*280, floor(i/4)*200` so cards never collide on narrow embedded previews.
@@ -144,6 +171,12 @@ Five prompts in user message #347 audited and closed.
 ### Integration test (Prompt 5)
 - TTFT **22 ms** (target < 500 ms)
 - Stats badge, sidebar (11 sessions), Workspaces (2 cards), Memory List/Graph, Export, Memory toggle — all green.
+
+## Implemented (v4.4 · 8-Jun-2026 — Crew/Switcher Fixes + View Body i18n)
+- ✅ Crew Builder card overlap fixed (220px width, line-clamp-2, wider node positions).
+- ✅ LanguageSwitcher dropdown opens upward in sidebar variant + scrollable.
+- ✅ View body translations: home / router / crew / memory / workspaces namespaces wired into the 5 views.
+
 
 ## Implemented (v4.3 · 8-Jun-2026 — Floating Session Translator)
 - ✅ Per-session `reply_lang` override (PATCH `/api/sessions/{id}` accepts en|id|zh|es|ar).
@@ -303,5 +336,5 @@ Four cohesive additions; PETER is now a **portfolio of private councils**.
 - ✅ HTML `<meta description>` + OG tags + FastAPI app title updated.
 
 ## Next Action Items
-- Iteration 6 closed (Crew overlap + Switcher upward + View body i18n). User can now switch UI to any of the 5 locales and see translated headlines / subtitles / buttons across Home / Router / Crew / Memory / Workspaces / Cost / Chat / Settings.
-- P2 backlog: backend i18n for `/api/agents` (role names + goals + status enum); Settings tier `purpose` text; per-session system-prompt versioning; WorkspaceSelector outside-click close; React Router v7 future flags; "Clear override" UX on the EN/ID/ZH/ES/AR badge.
+- Iteration 7 closed (Backend i18n). With Accept-Language wired through axios, switching UI to any locale now translates: nav, page headlines + bodies, crew agent roles + goals + statuses, tier names + purposes, switcher options, didYouMean hints, sidebar 🌐 session translator, footer brand (locked LTR).
+- P2 backlog: backstory + task fields stay EN (intentional — LLM-facing); per-session system-prompt versioning; WorkspaceSelector outside-click close; React Router v7 future flags; "Clear override" UX on the EN/ID/ZH/ES/AR badge.

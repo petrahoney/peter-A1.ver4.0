@@ -113,7 +113,11 @@
     "awaitingContext": "Awaiting upstream context.",
     "thinking": "Thinking…",
     "noOutput": "No output yet.",
-    "tier": "tier"
+    "tier": "tier",
+    "statusPending": "Pending",
+    "statusRunning": "Running",
+    "statusDone": "Done",
+    "statusError": "Error"
   },
   "memory": {
     "label": "Strategist Memory",

@@ -113,7 +113,11 @@
     "awaitingContext": "等待上游上下文。",
     "thinking": "思考中…",
     "noOutput": "暂无输出。",
-    "tier": "层级"
+    "tier": "层级",
+    "statusPending": "等待中",
+    "statusRunning": "运行中",
+    "statusDone": "完成",
+    "statusError": "错误"
   },
   "memory": {
     "label": "策略师记忆",

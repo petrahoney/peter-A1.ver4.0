@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, AsyncIterator, Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -29,6 +29,12 @@ from pydantic import BaseModel, Field
 
 from ai_router import AIRouter, TaskComplexity, TIER_CATALOG
 from crew_manager import PeterCrewManager, AGENT_BLUEPRINT
+from i18n import (
+    pick_locale,
+    translate_agents,
+    translate_tier_catalog,
+    status_labels,
+)
 from memory import StrategistMemory, MEMORY_TYPES
 
 load_dotenv()
@@ -146,15 +152,24 @@ async def root() -> dict[str, Any]:
 
 
 @app.get("/api/tiers")
-async def list_tiers() -> dict[str, Any]:
+async def list_tiers(request: Request) -> dict[str, Any]:
     """Return the model tier catalog for the frontend UI."""
-    return {"tiers": TIER_CATALOG}
+    locale = pick_locale(request.headers.get("accept-language"))
+    return {"tiers": translate_tier_catalog(TIER_CATALOG, locale), "locale": locale}
 
 
 @app.get("/api/agents")
-async def list_agents() -> dict[str, Any]:
+async def list_agents(request: Request) -> dict[str, Any]:
     """Return the 7-agent blueprint for the Crew builder."""
-    return {"agents": AGENT_BLUEPRINT}
+    locale = pick_locale(request.headers.get("accept-language"))
+    return {"agents": translate_agents(AGENT_BLUEPRINT, locale), "locale": locale}
+
+
+@app.get("/api/i18n/status")
+async def i18n_status(request: Request) -> dict[str, Any]:
+    """Localised labels for the crew run lifecycle states."""
+    locale = pick_locale(request.headers.get("accept-language"))
+    return {"locale": locale, "labels": status_labels(locale)}
 
 
 # ───────────────────────── Router endpoints ─────────────────────────
@@ -418,19 +433,33 @@ async def crew_build(req: CrewBuildRequest) -> dict[str, Any]:
 
 
 @app.get("/api/crew/runs/{run_id}")
-async def crew_status(run_id: str) -> dict[str, Any]:
+async def crew_status(run_id: str, request: Request) -> dict[str, Any]:
     run = await db.crew_runs.find_one({"_id": run_id})
     if not run:
         raise HTTPException(404, "run not found")
+    locale = pick_locale(request.headers.get("accept-language"))
+    # Translate role + goal on each agent for the active locale; preserve
+    # per-agent runtime fields (status, output, timings, cost).
+    tr_blueprint = translate_agents(AGENT_BLUEPRINT, locale)
+    tr_by_id = {a["id"]: a for a in tr_blueprint}
+    agents_localised = []
+    for a in run["agents"]:
+        merged = dict(a)
+        tr = tr_by_id.get(a["id"])
+        if tr:
+            merged["role"] = tr["role"]
+            merged["goal"] = tr["goal"]
+        agents_localised.append(merged)
     return {
         "id": run["_id"],
         "requirements": run["requirements"],
         "status": run["status"],
-        "agents": run["agents"],
+        "agents": agents_localised,
         "total_cost_usd": run.get("total_cost_usd", 0.0),
         "total_saved_usd": run.get("total_saved_usd", 0.0),
         "created_at": run.get("created_at"),
         "finished_at": run.get("finished_at"),
+        "locale": locale,
     }
 
 
@@ -460,7 +489,7 @@ async def crew_list(workspace_id: Optional[str] = None) -> dict[str, Any]:
 
 
 @app.get("/api/stats")
-async def stats(workspace_id: Optional[str] = None) -> dict[str, Any]:
+async def stats(request: Request, workspace_id: Optional[str] = None) -> dict[str, Any]:
     # Workspace scoping: messages don't carry workspace_id directly, so we
     # resolve via sessions. Special value "__none__" → untagged sessions.
     match_stage: dict[str, Any] = {"role": "assistant"}
@@ -539,7 +568,9 @@ async def stats(workspace_id: Optional[str] = None) -> dict[str, Any]:
         "totals": totals,
         "tier_breakdown": tier_breakdown,
         "recent": recent,
-        "tier_catalog": TIER_CATALOG,
+        "tier_catalog": translate_tier_catalog(
+            TIER_CATALOG, pick_locale(request.headers.get("accept-language"))
+        ),
         "workspace_id": workspace_id,
     }
 

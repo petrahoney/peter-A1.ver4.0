@@ -68,7 +68,7 @@ function AgentNode({ data }) {
 const nodeTypes = { agent: AgentNode };
 
 export default function CrewView() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [blueprint, setBlueprint] = useState([]);
   const [reqs, setReqs] = useState("");
   const [runId, setRunId] = useState(null);
@@ -77,10 +77,12 @@ export default function CrewView() {
   const [pastRuns, setPastRuns] = useState([]);
   const pollRef = useRef(null);
 
+  // Re-fetch the agent blueprint whenever the UI language changes so the
+  // backend can return localised role + goal strings.
   useEffect(() => {
     listAgents().then((r) => setBlueprint(r.agents)).catch(() => {});
     crewList().then((r) => setPastRuns(r.runs)).catch(() => {});
-  }, []);
+  }, [i18n.language]);
 
   useEffect(() => {
     if (!runId) return;
@@ -225,11 +227,11 @@ export default function CrewView() {
                 className="text-[10px] tracking-[0.3em] uppercase mb-1"
                 style={{ color: STATUS_COLOR[selected.status] }}
               >
-                {selected.status}
+                {t(`crew.status${selected.status.charAt(0).toUpperCase()}${selected.status.slice(1)}`, selected.status)}
               </div>
               <div className="h-display text-2xl text-peter-ivory">{selected.role}</div>
               <div className="text-[11px] text-peter-dim mt-1 font-mono">
-                tier: {selected.tier}
+                {t("crew.tier")}: {selected.tier}
                 {selected.model ? ` · ${selected.model}` : ""}
               </div>
               <div className="text-xs text-peter-ivory/70 mt-3 leading-relaxed font-light">
@@ -286,7 +288,7 @@ export default function CrewView() {
               {t("crew.status")}
             </span>
             <span style={{ color: STATUS_COLOR[run.status] || "#C9A84C" }}>
-              {run.status}
+              {t(`crew.status${run.status.charAt(0).toUpperCase()}${run.status.slice(1)}`, run.status)}
             </span>
           </div>
           <div>
@@ -323,7 +325,7 @@ export default function CrewView() {
                   className="text-[10px] tracking-[0.3em] uppercase mb-1"
                   style={{ color: STATUS_COLOR[r.status] }}
                 >
-                  {r.status}
+                  {t(`crew.status${r.status.charAt(0).toUpperCase()}${r.status.slice(1)}`, r.status)}
                 </div>
                 <div className="text-sm text-peter-ivory/90 font-light truncate">
                   {r.requirements}

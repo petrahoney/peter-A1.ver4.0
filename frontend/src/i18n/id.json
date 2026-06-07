@@ -113,7 +113,11 @@
     "awaitingContext": "Menunggu konteks sebelumnya.",
     "thinking": "Berpikir…",
     "noOutput": "Belum ada keluaran.",
-    "tier": "tingkat"
+    "tier": "tingkat",
+    "statusPending": "Menunggu",
+    "statusRunning": "Berjalan",
+    "statusDone": "Selesai",
+    "statusError": "Galat"
   },
   "memory": {
     "label": "Memori Strategis",

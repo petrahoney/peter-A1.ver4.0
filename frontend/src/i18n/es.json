@@ -113,7 +113,11 @@
     "awaitingContext": "Esperando contexto previo.",
     "thinking": "Pensando…",
     "noOutput": "Aún sin salida.",
-    "tier": "nivel"
+    "tier": "nivel",
+    "statusPending": "Pendiente",
+    "statusRunning": "En ejecución",
+    "statusDone": "Hecho",
+    "statusError": "Error"
   },
   "memory": {
     "label": "Memoria del Estratega",

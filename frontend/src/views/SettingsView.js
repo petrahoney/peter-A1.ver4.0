@@ -4,11 +4,11 @@ import { tiers } from "../lib/api";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 
 export default function SettingsView() {
-  const { t: i18nT } = useTranslation();
+  const { t: i18nT, i18n } = useTranslation();
   const [tierMap, setTierMap] = useState({});
   useEffect(() => {
     tiers().then((r) => setTierMap(r.tiers)).catch(() => {});
-  }, []);
+  }, [i18n.language]);
 
   return (
     <div className="p-12">

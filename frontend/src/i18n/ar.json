@@ -113,7 +113,11 @@
     "awaitingContext": "بانتظار سياق سابق.",
     "thinking": "يفكّر…",
     "noOutput": "لا ناتج بعد.",
-    "tier": "المستوى"
+    "tier": "المستوى",
+    "statusPending": "قيد الانتظار",
+    "statusRunning": "قيد التشغيل",
+    "statusDone": "تمّ",
+    "statusError": "خطأ"
   },
   "memory": {
     "label": "ذاكرة الاستراتيجي",

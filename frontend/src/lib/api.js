@@ -1,4 +1,5 @@
 import axios from "axios";
+import i18n from "../i18n";
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND}/api`;
@@ -6,6 +7,15 @@ const API = `${BACKEND}/api`;
 export const api = axios.create({
   baseURL: API,
   timeout: 180000,
+});
+
+// Auto-attach the active UI language so backend i18n (agents, tiers, status…)
+// returns localised display strings.
+api.interceptors.request.use((config) => {
+  const lng = (i18n && i18n.language) || "en";
+  config.headers = config.headers || {};
+  config.headers["Accept-Language"] = lng;
+  return config;
 });
 
 export const tiers = () => api.get("/tiers").then((r) => r.data);
