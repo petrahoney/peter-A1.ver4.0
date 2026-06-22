@@ -1,0 +1,1425 @@
+"""
+PETER AI v4.0 — Enterprise Multi-Model AI Platform
+The Luxury Strategist's Command Center.
+
+This is the FastAPI backend that powers the AI Router, multi-model chat,
+and a lightweight 7-agent CrewAI-style orchestration. All LLM calls go
+through the Emergent Universal Key (emergentintegrations.llm.chat).
+
+Note: In the live preview the "FREE" Ollama tier is simulated using
+gemini-3-flash-preview (cheapest available). The docker-compose deploy
+folder wires the real Ollama llama3.3 endpoint for local self-hosting.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import os
+import time
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Any, AsyncIterator, Optional
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from motor.motor_asyncio import AsyncIOMotorClient
+from pydantic import BaseModel, Field
+
+from ai_router import AIRouter, TaskComplexity, TIER_CATALOG
+from crew_manager import PeterCrewManager, AGENT_BLUEPRINT
+from script_studio import (
+    generate_script as studio_generate_script,
+    evaluate_script as studio_evaluate_script,
+    generate_genius_prompt as studio_generate_genius_prompt,
+    stream_genius_prompt as studio_stream_genius_prompt,
+)
+from i18n import (
+    pick_locale,
+    translate_agents,
+    translate_tier_catalog,
+    status_labels,
+)
+from memory import StrategistMemory, MEMORY_TYPES
+
+load_dotenv()
+
+# ───────────────────────── Bootstrap ─────────────────────────
+
+MONGO_URL = os.environ["MONGO_URL"]
+DB_NAME = os.environ["DB_NAME"]
+EMERGENT_LLM_KEY = os.environ["EMERGENT_LLM_KEY"]
+
+mongo_client = AsyncIOMotorClient(MONGO_URL)
+db = mongo_client[DB_NAME]
+
+memory_engine = StrategistMemory(api_key=EMERGENT_LLM_KEY)
+router_engine = AIRouter(api_key=EMERGENT_LLM_KEY, db=db, memory=memory_engine)
+crew_engine = PeterCrewManager(api_key=EMERGENT_LLM_KEY, db=db, router=router_engine)
+
+app = FastAPI(
+    title="PETER AI v4.0",
+    version="4.0.0",
+    description="PETER AI (Personal Enhanced Thinking & Execution Robot) — The Luxury Strategist's Command Center.",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+_REPLY_LANG_NAMES: dict[str, str] = {
+    "en": "English",
+    "id": "Bahasa Indonesia",
+    "zh": "Mandarin Chinese (中文)",
+    "es": "Spanish (Español)",
+    "ar": "Arabic (العربية)",
+}
+
+
+def apply_reply_lang(message: str, reply_lang: Optional[str]) -> str:
+    """If a session has a `reply_lang` override, ask PETER to answer in that
+    language regardless of the user's input script. The directive is appended
+    so it doesn't pollute memory recall on the user's actual question.
+    """
+    if not reply_lang:
+        return message
+    name = _REPLY_LANG_NAMES.get(reply_lang)
+    if not name:
+        return message
+    # Framed as an explicit user preference — overrides the default
+    # auto-language-mirroring rule in the system prompt.
+    return (
+        f"{message}\n\n"
+        f"[User preference for THIS thread: please reply in {name}, even when "
+        f"my message is written in another language. This overrides the default "
+        f"mirror-the-input-language behaviour for this conversation only.]"
+    )
+
+
+# ───────────────────────── Schemas ─────────────────────────
+
+
+class ChatRequest(BaseModel):
+    message: str
+    session_id: Optional[str] = None
+    force_tier: Optional[str] = None  # "free" | "cheap" | "smart" | "critical"
+    workspace_id: Optional[str] = None  # active workspace, if any
+    memory_enabled: Optional[bool] = None  # explicit override for this turn
+
+
+class ClassifyRequest(BaseModel):
+    query: str
+
+
+class CrewBuildRequest(BaseModel):
+    requirements: str
+    workspace_id: Optional[str] = None
+
+
+class FeedbackRequest(BaseModel):
+    query_id: str
+    rating: int
+
+
+class MemoryCreateRequest(BaseModel):
+    content: str
+    type: Optional[str] = "note"
+    workspace_id: Optional[str] = None
+
+
+class WorkspaceRequest(BaseModel):
+    name: str
+    description: Optional[str] = ""
+    color: Optional[str] = None  # any hex string
+
+
+# ───────────────────────── Health & Meta ─────────────────────────
+
+
+@app.get("/api/")
+async def root() -> dict[str, Any]:
+    return {
+        "name": "PETER AI",
+        "version": "4.0.0",
+        "tagline": "Intelligence, Elevated.",
+        "archetype": "The Luxury Strategist",
+        "status": "online",
+    }
+
+
+@app.get("/api/tiers")
+async def list_tiers(request: Request) -> dict[str, Any]:
+    """Return the model tier catalog for the frontend UI."""
+    locale = pick_locale(request.headers.get("accept-language"))
+    return {"tiers": translate_tier_catalog(TIER_CATALOG, locale), "locale": locale}
+
+
+@app.get("/api/agents")
+async def list_agents(request: Request) -> dict[str, Any]:
+    """Return the 7-agent blueprint for the Crew builder."""
+    locale = pick_locale(request.headers.get("accept-language"))
+    return {"agents": translate_agents(AGENT_BLUEPRINT, locale), "locale": locale}
+
+
+@app.get("/api/i18n/status")
+async def i18n_status(request: Request) -> dict[str, Any]:
+    """Localised labels for the crew run lifecycle states."""
+    locale = pick_locale(request.headers.get("accept-language"))
+    return {"locale": locale, "labels": status_labels(locale)}
+
+
+# ───────────────────────── Router endpoints ─────────────────────────
+
+
+@app.post("/api/router/classify")
+async def classify(req: ClassifyRequest) -> dict[str, Any]:
+    """Classify a query without invoking any LLM — instant pattern match."""
+    complexity, matched_pattern = router_engine.classify_query_verbose(req.query)
+    return {
+        "tier": complexity.value,
+        "tier_meta": TIER_CATALOG[complexity.value],
+        "matched_pattern": matched_pattern,
+        "query": req.query,
+    }
+
+
+@app.post("/api/chat")
+async def chat(req: ChatRequest) -> dict[str, Any]:
+    """Route + run a single chat turn. Persists messages in MongoDB."""
+    session_id = req.session_id or str(uuid.uuid4())
+
+# Extract user_id from session_id (format: "user_123::rest")
+    if "::" in session_id:
+        user_id = session_id.split("::")[0]
+    else:
+        user_id = getattr(req, "_user_id", None)
+        if not user_id:
+            raise HTTPException(400, "user_id required")
+
+    # Ensure session exists
+    existing = await db.sessions.find_one({
+        "_id": session_id,
+        "user_id": user_id
+    })
+    if not existing:
+        await db.sessions.insert_one(
+            {
+                "user_id": user_id,
+                "_id": session_id,
+                "created_at": now_iso(),
+                "updated_at": now_iso(),
+                "title": req.message[:60],
+                "force_tier": (req.force_tier or "").lower() or None,
+                "workspace_id": req.workspace_id or None,
+                "memory_enabled": True if req.memory_enabled is None else bool(req.memory_enabled),
+            }
+        )
+        memory_enabled = True if req.memory_enabled is None else bool(req.memory_enabled)
+        ws_id = req.workspace_id
+        reply_lang = None
+    else:
+        updates = {}
+        if req.force_tier is not None:
+            updates["force_tier"] = req.force_tier.lower() or None
+        if updates:
+            await db.sessions.update_one({"_id": session_id}, {"$set": updates})
+        memory_enabled = existing.get("memory_enabled", True)
+        if req.memory_enabled is not None:
+            memory_enabled = bool(req.memory_enabled)
+        ws_id = existing.get("workspace_id") or req.workspace_id
+        reply_lang = existing.get("reply_lang")
+
+    # Save user message
+    user_msg_id = str(uuid.uuid4())
+    await db.messages.insert_one(
+        {
+            "_id": user_msg_id,
+            "session_id": session_id,
+            "role": "user",
+            "content": req.message,
+            "created_at": now_iso(),
+        }
+    )
+
+    forced = None
+    if req.force_tier:
+        try:
+            forced = TaskComplexity(req.force_tier.lower())
+        except ValueError:
+            raise HTTPException(400, f"unknown tier: {req.force_tier}")
+
+    result = await router_engine.route_and_run(
+        query=apply_reply_lang(req.message, reply_lang),
+        session_id=session_id,
+        forced=forced,
+        workspace_id=ws_id,
+        memory_enabled=memory_enabled,
+    )
+
+    ai_msg_id = str(uuid.uuid4())
+    await db.messages.insert_one(
+        {
+            "_id": ai_msg_id,
+            "session_id": session_id,
+            "role": "assistant",
+            "content": result["response"],
+            "tier": result["tier"],
+            "model": result["model"],
+            "cost_usd": result["cost_usd"],
+            "latency_ms": result["latency_ms"],
+            "saved_usd": result["saved_usd"],
+            "created_at": now_iso(),
+        }
+    )
+
+    await db.sessions.update_one(
+        {"_id": session_id}, {"$set": {"updated_at": now_iso()}}
+    )
+
+    if memory_enabled:
+        asyncio.create_task(
+            memory_engine.extract_and_store(
+                session_id, req.message, result["response"], workspace_id=ws_id
+            )
+        )
+
+    return {
+        "session_id": session_id,
+        "message_id": ai_msg_id,
+        **result,
+    }
+
+
+class SessionRenameRequest(BaseModel):
+    title: Optional[str] = None
+    force_tier: Optional[str] = None  # "free"|"cheap"|"smart"|"critical"|"" to clear
+    memory_enabled: Optional[bool] = None
+    workspace_id: Optional[str] = None  # "" or null to clear
+    reply_lang: Optional[str] = None  # 2-letter UI locale ("en"|"id"|"zh"|"es"|"ar"|"" to clear)
+
+
+@app.get("/api/sessions")
+async def list_sessions(workspace_id: Optional[str] = None) -> dict[str, Any]:
+    query = {}
+    if workspace_id == "__none__":
+        query["workspace_id"] = {"$in": [None, ""]}
+    elif workspace_id:
+        query["workspace_id"] = workspace_id
+    cursor = db.sessions.find(query, sort=[("updated_at", -1)]).limit(50)
+    sessions = []
+    async for s in cursor:
+        sessions.append(
+            {
+                "id": s["_id"],
+                "title": s.get("title", "Untitled"),
+                "force_tier": s.get("force_tier"),
+                "memory_enabled": s.get("memory_enabled", True),
+                "workspace_id": s.get("workspace_id"),
+                "reply_lang": s.get("reply_lang"),
+                "created_at": s.get("created_at"),
+                "updated_at": s.get("updated_at"),
+            }
+        )
+    return {"sessions": sessions}
+
+
+@app.patch("/api/sessions/{session_id}")
+async def update_session(session_id: str, req: SessionRenameRequest) -> dict[str, Any]:
+    updates: dict[str, Any] = {}
+    if req.title is not None:
+        title = req.title.strip()[:120]
+        if not title:
+            raise HTTPException(400, "title cannot be empty")
+        updates["title"] = title
+    if req.force_tier is not None:
+        ft = req.force_tier.strip().lower()
+        if ft == "":
+            updates["force_tier"] = None
+        else:
+            try:
+                TaskComplexity(ft)
+            except ValueError:
+                raise HTTPException(400, f"unknown tier: {req.force_tier}")
+            updates["force_tier"] = ft
+    if req.memory_enabled is not None:
+        updates["memory_enabled"] = bool(req.memory_enabled)
+    if req.workspace_id is not None:
+        updates["workspace_id"] = req.workspace_id or None
+    if req.reply_lang is not None:
+        rl = (req.reply_lang or "").strip().lower()
+        if rl == "":
+            updates["reply_lang"] = None
+        elif rl in {"en", "id", "zh", "es", "ar"}:
+            updates["reply_lang"] = rl
+        else:
+            raise HTTPException(400, f"unsupported reply_lang: {req.reply_lang}")
+    if not updates:
+        raise HTTPException(400, "no updates provided")
+    updates["updated_at"] = now_iso()
+    result = await db.sessions.update_one({"_id": session_id}, {"$set": updates})
+    if result.matched_count == 0:
+        raise HTTPException(404, "session not found")
+    s = await db.sessions.find_one({"_id": session_id})
+    return {
+        "id": session_id,
+        "title": s.get("title"),
+        "force_tier": s.get("force_tier"),
+        "memory_enabled": s.get("memory_enabled", True),
+        "workspace_id": s.get("workspace_id"),
+        "reply_lang": s.get("reply_lang"),
+    }
+
+
+@app.delete("/api/sessions/{session_id}")
+async def delete_session(session_id: str) -> dict[str, Any]:
+    s = await db.sessions.find_one({"_id": session_id})
+    if not s:
+        raise HTTPException(404, "session not found")
+    await db.messages.delete_many({"session_id": session_id})
+    await db.sessions.delete_one({"_id": session_id})
+    # Also drop in-memory LlmChat instances for this session so a new
+    # session_id starts fresh.
+    router_engine.drop_session(session_id)
+    return {"id": session_id, "deleted": True}
+
+
+
+@app.get("/api/sessions/{session_id}/messages")
+async def get_messages(session_id: str) -> dict[str, Any]:
+    session = await db.sessions.find_one({"_id": session_id})
+    cursor = db.messages.find({"session_id": session_id}, sort=[("created_at", 1)])
+    messages = []
+    async for m in cursor:
+        messages.append(
+            {
+                "id": m["_id"],
+                "role": m["role"],
+                "content": m["content"],
+                "tier": m.get("tier"),
+                "model": m.get("model"),
+                "cost_usd": m.get("cost_usd"),
+                "latency_ms": m.get("latency_ms"),
+                "saved_usd": m.get("saved_usd"),
+                "created_at": m.get("created_at"),
+            }
+        )
+    return {
+        "session_id": session_id,
+        "title": session.get("title") if session else None,
+        "force_tier": session.get("force_tier") if session else None,
+        "memory_enabled": session.get("memory_enabled", True) if session else True,
+        "workspace_id": session.get("workspace_id") if session else None,
+        "reply_lang": session.get("reply_lang") if session else None,
+        "messages": messages,
+    }
+
+
+# ───────────────────────── Crew (multi-agent) ─────────────────────────
+
+
+@app.post("/api/crew/build")
+async def crew_build(req: CrewBuildRequest) -> dict[str, Any]:
+    """Kick off a 7-agent app-builder workflow (runs in background)."""
+    run_id = str(uuid.uuid4())
+    await db.crew_runs.insert_one(
+        {
+            "_id": run_id,
+            "requirements": req.requirements,
+            "workspace_id": req.workspace_id or None,
+            "status": "running",
+            "created_at": now_iso(),
+            "agents": [
+                {**a, "status": "pending", "output": None, "started_at": None, "finished_at": None}
+                for a in AGENT_BLUEPRINT
+            ],
+            "total_cost_usd": 0.0,
+            "total_saved_usd": 0.0,
+        }
+    )
+    asyncio.create_task(crew_engine.run_crew(run_id, req.requirements))
+    return {"run_id": run_id, "status": "running"}
+
+
+@app.get("/api/crew/runs/{run_id}")
+async def crew_status(run_id: str, request: Request) -> dict[str, Any]:
+    run = await db.crew_runs.find_one({"_id": run_id})
+    if not run:
+        raise HTTPException(404, "run not found")
+    locale = pick_locale(request.headers.get("accept-language"))
+    # Translate role + goal on each agent for the active locale; preserve
+    # per-agent runtime fields (status, output, timings, cost).
+    tr_blueprint = translate_agents(AGENT_BLUEPRINT, locale)
+    tr_by_id = {a["id"]: a for a in tr_blueprint}
+    agents_localised = []
+    for a in run["agents"]:
+        merged = dict(a)
+        tr = tr_by_id.get(a["id"])
+        if tr:
+            merged["role"] = tr["role"]
+            merged["goal"] = tr["goal"]
+        agents_localised.append(merged)
+    return {
+        "id": run["_id"],
+        "requirements": run["requirements"],
+        "status": run["status"],
+        "agents": agents_localised,
+        "total_cost_usd": run.get("total_cost_usd", 0.0),
+        "total_saved_usd": run.get("total_saved_usd", 0.0),
+        "created_at": run.get("created_at"),
+        "finished_at": run.get("finished_at"),
+        "locale": locale,
+    }
+
+
+@app.get("/api/crew/runs")
+async def crew_list(workspace_id: Optional[str] = None) -> dict[str, Any]:
+    query = {}
+    if workspace_id == "__none__":
+        query["workspace_id"] = {"$in": [None, ""]}
+    elif workspace_id:
+        query["workspace_id"] = workspace_id
+    cursor = db.crew_runs.find(query, sort=[("created_at", -1)]).limit(20)
+    runs = []
+    async for r in cursor:
+        runs.append(
+            {
+                "id": r["_id"],
+                "requirements": r["requirements"][:120],
+                "status": r["status"],
+                "workspace_id": r.get("workspace_id"),
+                "created_at": r.get("created_at"),
+            }
+        )
+    return {"runs": runs}
+
+
+# ───────────────────────── Cost / Stats dashboard ─────────────────────────
+
+
+@app.get("/api/stats")
+async def stats(request: Request, workspace_id: Optional[str] = None) -> dict[str, Any]:
+    # Workspace scoping: messages don't carry workspace_id directly, so we
+    # resolve via sessions. Special value "__none__" → untagged sessions.
+    match_stage: dict[str, Any] = {"role": "assistant"}
+    if workspace_id:
+        ws_query: dict[str, Any] = {}
+        if workspace_id == "__none__":
+            ws_query["workspace_id"] = {"$in": [None, ""]}
+        else:
+            ws_query["workspace_id"] = workspace_id
+        session_ids = [s["_id"] async for s in db.sessions.find(ws_query, {"_id": 1})]
+        match_stage["session_id"] = {"$in": session_ids}
+
+    pipeline_tier = [
+        {"$match": match_stage},
+        {
+            "$group": {
+                "_id": "$tier",
+                "count": {"$sum": 1},
+                "cost": {"$sum": "$cost_usd"},
+                "saved": {"$sum": "$saved_usd"},
+                "avg_latency_ms": {"$avg": "$latency_ms"},
+            }
+        },
+    ]
+    tier_breakdown: dict[str, Any] = {}
+    async for row in db.messages.aggregate(pipeline_tier):
+        tier = row["_id"] or "unknown"
+        tier_breakdown[tier] = {
+            "count": row["count"],
+            "cost_usd": round(row["cost"] or 0.0, 6),
+            "saved_usd": round(row["saved"] or 0.0, 6),
+            "avg_latency_ms": round(row["avg_latency_ms"] or 0.0, 1),
+        }
+
+    totals = {
+        "total_queries": 0,
+        "total_cost_usd": 0.0,
+        "total_saved_usd": 0.0,
+        "avg_latency_ms": 0.0,
+    }
+    latencies: list[float] = []
+    for v in tier_breakdown.values():
+        totals["total_queries"] += v["count"]
+        totals["total_cost_usd"] += v["cost_usd"]
+        totals["total_saved_usd"] += v["saved_usd"]
+        if v["avg_latency_ms"]:
+            latencies.append(v["avg_latency_ms"])
+    if latencies:
+        totals["avg_latency_ms"] = round(sum(latencies) / len(latencies), 1)
+    totals["total_cost_usd"] = round(totals["total_cost_usd"], 6)
+    totals["total_saved_usd"] = round(totals["total_saved_usd"], 6)
+
+    # Recent queries (last 15) — same workspace filter
+    recent_query: dict[str, Any] = {"role": "assistant"}
+    if workspace_id:
+        recent_query["session_id"] = match_stage["session_id"]
+    recent_cursor = db.messages.find(
+        recent_query, sort=[("created_at", -1)]
+    ).limit(15)
+    recent: list[dict[str, Any]] = []
+    async for m in recent_cursor:
+        recent.append(
+            {
+                "id": m["_id"],
+                "tier": m.get("tier"),
+                "model": m.get("model"),
+                "cost_usd": m.get("cost_usd"),
+                "saved_usd": m.get("saved_usd"),
+                "latency_ms": m.get("latency_ms"),
+                "preview": (m.get("content") or "")[:140],
+                "created_at": m.get("created_at"),
+            }
+        )
+
+    return {
+        "totals": totals,
+        "tier_breakdown": tier_breakdown,
+        "recent": recent,
+        "tier_catalog": translate_tier_catalog(
+            TIER_CATALOG, pick_locale(request.headers.get("accept-language"))
+        ),
+        "workspace_id": workspace_id,
+    }
+
+
+# ───────────────────────── Sparkline ─────────────────────────
+
+
+@app.get("/api/stats/sparkline")
+async def stats_sparkline(
+    workspace_id: Optional[str] = None, days: int = 7
+) -> dict[str, Any]:
+    """Per-tier daily series for the last N days (default 7), workspace-aware.
+
+    Returns one bucket per (tier, day) with count, cost_usd, saved_usd.
+    Days with no activity are zero-filled so the sparkline renders cleanly.
+    """
+    days = max(1, min(days, 90))
+    now = datetime.now(timezone.utc)
+    today = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+    # bucket boundaries (UTC midnight)
+    day_keys = []
+    for i in range(days - 1, -1, -1):
+        d = today - timedelta(days=i)
+        day_keys.append(d.strftime("%Y-%m-%d"))
+    start_iso = (today - timedelta(days=days - 1)).isoformat()
+
+    match_stage: dict[str, Any] = {
+        "role": "assistant",
+        "created_at": {"$gte": start_iso},
+    }
+    if workspace_id:
+        ws_query: dict[str, Any] = {}
+        if workspace_id == "__none__":
+            ws_query["workspace_id"] = {"$in": [None, ""]}
+        else:
+            ws_query["workspace_id"] = workspace_id
+        session_ids = [s["_id"] async for s in db.sessions.find(ws_query, {"_id": 1})]
+        match_stage["session_id"] = {"$in": session_ids}
+
+    pipeline = [
+        {"$match": match_stage},
+        {
+            "$group": {
+                "_id": {
+                    "tier": "$tier",
+                    "day": {"$substr": ["$created_at", 0, 10]},
+                },
+                "count": {"$sum": 1},
+                "cost": {"$sum": "$cost_usd"},
+                "saved": {"$sum": "$saved_usd"},
+            }
+        },
+    ]
+
+    by_tier: dict[str, dict[str, dict[str, float]]] = {}
+    async for row in db.messages.aggregate(pipeline):
+        tier = row["_id"]["tier"] or "unknown"
+        day = row["_id"]["day"]
+        by_tier.setdefault(tier, {})[day] = {
+            "count": row["count"],
+            "cost_usd": round(row["cost"] or 0.0, 6),
+            "saved_usd": round(row["saved"] or 0.0, 6),
+        }
+
+    series: dict[str, list[dict[str, Any]]] = {}
+    for tier in TIER_CATALOG.keys():
+        rows = by_tier.get(tier, {})
+        series[tier] = [
+            {
+                "date": dk,
+                "count": rows.get(dk, {}).get("count", 0),
+                "cost_usd": rows.get(dk, {}).get("cost_usd", 0.0),
+                "saved_usd": rows.get(dk, {}).get("saved_usd", 0.0),
+            }
+            for dk in day_keys
+        ]
+
+    totals_by_tier = {
+        tier: {
+            "count": sum(p["count"] for p in pts),
+            "cost_usd": round(sum(p["cost_usd"] for p in pts), 6),
+            "saved_usd": round(sum(p["saved_usd"] for p in pts), 6),
+        }
+        for tier, pts in series.items()
+    }
+
+    return {
+        "workspace_id": workspace_id,
+        "days": days,
+        "day_keys": day_keys,
+        "series": series,
+        "totals_by_tier": totals_by_tier,
+    }
+
+
+# ───────────────────────── Strategist Memory ─────────────────────────
+
+
+@app.get("/api/memory")
+async def memory_list(workspace_id: Optional[str] = None) -> dict[str, Any]:
+    items = await memory_engine.list_all(limit=500, workspace_id=workspace_id)
+    return {
+        "count": len(items),
+        "types": sorted(MEMORY_TYPES),
+        "workspace_id": workspace_id,
+        "memories": items,
+    }
+
+
+@app.get("/api/memory/recall")
+async def memory_recall(
+    q: str, limit: int = 5, workspace_id: Optional[str] = None
+) -> dict[str, Any]:
+    if not q:
+        raise HTTPException(400, "query 'q' required")
+    items = await memory_engine.recall(q, limit=limit, workspace_id=workspace_id)
+    return {"query": q, "workspace_id": workspace_id, "memories": items}
+
+
+@app.get("/api/memory/export")
+async def memory_export(workspace_id: Optional[str] = None) -> dict[str, Any]:
+    """Portable JSON snapshot of every memory (optionally filtered)."""
+    items = await memory_engine.list_all(limit=10000, workspace_id=workspace_id)
+    return {
+        "exported_at": now_iso(),
+        "workspace_id": workspace_id,
+        "count": len(items),
+        "memories": items,
+    }
+
+
+@app.get("/api/memory/graph")
+async def memory_graph(workspace_id: Optional[str] = None) -> dict[str, Any]:
+    """Cluster memories by type into a node-graph structure for the UI."""
+    items = await memory_engine.list_all(limit=1000, workspace_id=workspace_id)
+    by_type: dict[str, list[dict[str, Any]]] = {}
+    for m in items:
+        by_type.setdefault(m["type"], []).append(m)
+    clusters = []
+    for t in sorted(by_type.keys()):
+        clusters.append(
+            {
+                "type": t,
+                "count": len(by_type[t]),
+                "memories": [
+                    {
+                        "id": m["id"],
+                        "content": m["content"],
+                        "created_at": m.get("created_at"),
+                        "session_id": m.get("session_id"),
+                    }
+                    for m in by_type[t]
+                ],
+            }
+        )
+    return {
+        "workspace_id": workspace_id,
+        "total": len(items),
+        "clusters": clusters,
+    }
+
+
+@app.post("/api/memory")
+async def memory_create(req: MemoryCreateRequest) -> dict[str, Any]:
+    try:
+        item = await memory_engine.add_manual(
+            req.content, req.type or "note", workspace_id=req.workspace_id
+        )
+        return item
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.delete("/api/memory/{memory_id}")
+async def memory_delete(memory_id: str) -> dict[str, Any]:
+    await memory_engine.delete(memory_id)
+    return {"id": memory_id, "deleted": True}
+
+
+@app.delete("/api/memory")
+async def memory_clear(workspace_id: Optional[str] = None) -> dict[str, Any]:
+    n = await memory_engine.clear_all(workspace_id=workspace_id)
+    return {"cleared": n, "workspace_id": workspace_id}
+
+
+# ───────────────────────── Script Studio (P14 / P17 / P18) ─────────────────────────
+
+
+class ScriptGenerateRequest(BaseModel):
+    topic: str
+    platform: str = "tiktok"
+    style: str = "viral"
+    target_language: str = "en"
+    genius_prompt_id: Optional[str] = None  # if set, load saved prompt from DB
+
+
+class ScriptEvaluateRequest(BaseModel):
+    script: str
+    platform: str = "tiktok"
+
+
+class GeniusPromptRequest(BaseModel):
+    topic: str
+    platform: str = "tiktok"
+    style: str = "viral"
+    target_score: float = 8.5
+    iterations: int = 1  # 1=fast (~30s), 2-3=slower but better. Proxy cap ~100s.
+    save: bool = True
+    target_language: str = "en"  # locale for the prompt + sample scripts
+
+
+@app.post("/api/script/generate")
+async def script_generate(req: ScriptGenerateRequest) -> dict[str, Any]:
+    genius_prompt_text: Optional[str] = None
+    if req.genius_prompt_id:
+        doc = await db.genius_prompts.find_one({"_id": req.genius_prompt_id})
+        if not doc:
+            raise HTTPException(404, "genius prompt not found")
+        genius_prompt_text = doc.get("genius_prompt")
+    try:
+        out = await studio_generate_script(
+            req.topic, req.platform, req.style, req.target_language, genius_prompt_text,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    record = {
+        "_id": uuid.uuid4().hex,
+        "topic": req.topic,
+        "platform": req.platform,
+        "style": req.style,
+        "language": req.target_language,
+        "genius_prompt_id": req.genius_prompt_id,
+        "script": out.get("script"),
+        "hook": out.get("hook"),
+        "cta": out.get("cta"),
+        "tags": out.get("tags", []),
+        "duration_sec": out.get("duration_sec"),
+        "created_at": now_iso(),
+    }
+    await db.scripts.insert_one(record)
+    out["id"] = record["_id"]
+    return out
+
+
+@app.post("/api/script/evaluate")
+async def script_evaluate(req: ScriptEvaluateRequest) -> dict[str, Any]:
+    try:
+        out = await studio_evaluate_script(req.script, req.platform)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    await db.script_evaluations.insert_one(
+        {
+            "_id": uuid.uuid4().hex,
+            "platform": req.platform,
+            "scores": out.get("scores"),
+            "overall_score": out.get("overall_score"),
+            "weaknesses": out.get("weaknesses", []),
+            "strengths": out.get("strengths", []),
+            "created_at": now_iso(),
+        }
+    )
+    return out
+
+
+@app.post("/api/genius-prompt/generate")
+async def genius_prompt_generate(req: GeniusPromptRequest) -> dict[str, Any]:
+    try:
+        out = await studio_generate_genius_prompt(
+            req.topic, req.platform, req.style, req.target_score, req.iterations,
+            target_language=req.target_language,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    if req.save:
+        doc = {**out, "_id": out["id"]}
+        del doc["id"]
+        await db.genius_prompts.insert_one(doc)
+    return out
+
+
+@app.post("/api/genius-prompt/stream")
+async def genius_prompt_stream(req: GeniusPromptRequest) -> StreamingResponse:
+    """[Legacy] Single-shot SSE variant — kept for tooling that does not
+    support the job-queue flow. Subject to the cluster ingress hard
+    max-duration cap (~60s); prefer POST /api/genius-prompt/jobs +
+    GET /api/genius-prompt/jobs/{id}/events for production use.
+    """
+
+    import json as _json
+
+    async def event_source() -> AsyncIterator[bytes]:
+        yield b": studio-stream-open\n\n"
+        final_payload: Optional[dict[str, Any]] = None
+        errored = False
+
+        gen = studio_stream_genius_prompt(
+            req.topic, req.platform, req.style, req.target_score, req.iterations,
+            target_language=req.target_language,
+        )
+        next_task: Optional[asyncio.Task] = asyncio.create_task(gen.__anext__())
+        try:
+            while True:
+                done, _ = await asyncio.wait({next_task}, timeout=10)
+                if not done:
+                    yield b": heartbeat\n\n"
+                    continue
+                try:
+                    event = next_task.result()
+                except StopAsyncIteration:
+                    break
+                except Exception as e:
+                    errored = True
+                    yield (
+                        f"data: {_json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
+                    ).encode("utf-8")
+                    break
+
+                if event.get("type") == "final":
+                    final_payload = event.get("result")
+                if event.get("type") == "error":
+                    errored = True
+                yield f"data: {_json.dumps(event, ensure_ascii=False)}\n\n".encode("utf-8")
+
+                next_task = asyncio.create_task(gen.__anext__())
+        finally:
+            if next_task and not next_task.done():
+                next_task.cancel()
+
+        if req.save and final_payload and not errored:
+            try:
+                doc = {**final_payload, "_id": final_payload["id"]}
+                del doc["id"]
+                await db.genius_prompts.insert_one(doc)
+            except Exception as e:
+                yield (
+                    f"data: {_json.dumps({'type': 'warning', 'message': f'save_failed: {e}'}, ensure_ascii=False)}\n\n"
+                ).encode("utf-8")
+
+        yield b"event: end\ndata: {}\n\n"
+
+    return StreamingResponse(
+        event_source(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+# ───────────── Job-queue pattern (proxy-safe long SSE) ─────────────
+#
+# The cluster ingress enforces a HARD ~60s max-duration on any single
+# streaming HTTP response — heartbeats alone cannot prevent disconnect.
+# Solution: decouple the long-running LLM job from the HTTP response.
+#   1. POST /api/genius-prompt/jobs                — spawns a background
+#      asyncio task, returns {job_id} in <100ms.
+#   2. GET /api/genius-prompt/jobs/{id}/events?cursor=N — opens a short-
+#      lived SSE that streams events accumulated by the background task
+#      starting at index N. The endpoint proactively closes with
+#      `event: pause` after ~50 wall-clock seconds (before the 60s cap),
+#      handing a fresh cursor back to the client which simply reconnects.
+#      The background job continues uninterrupted. When `final`/`error`
+#      arrives the endpoint sends `event: end` and the client stops
+#      reconnecting.
+
+_STUDIO_JOBS: dict[str, dict[str, Any]] = {}
+_STUDIO_JOB_TTL_SECONDS = 1800  # 30 minutes
+# Default wall-clock seconds before a single GET /jobs/{id}/events
+# connection emits `event: pause` and closes. Production is 50s
+# (under the ~60s ingress cap); tests can override per-request via the
+# `?pause_seconds=` query param.
+_SSE_PAUSE_SECONDS = 50.0
+
+
+async def _purge_studio_job(job_id: str) -> None:
+    await asyncio.sleep(_STUDIO_JOB_TTL_SECONDS)
+    _STUDIO_JOBS.pop(job_id, None)
+
+
+async def _run_studio_job(job_id: str, req: GeniusPromptRequest) -> None:
+    job = _STUDIO_JOBS[job_id]
+    try:
+        async for event in studio_stream_genius_prompt(
+            req.topic, req.platform, req.style, req.target_score, req.iterations,
+            target_language=req.target_language,
+        ):
+            job["events"].append(event)
+            if event.get("type") == "final":
+                job["final"] = event.get("result")
+            if event.get("type") == "error":
+                job["errored"] = True
+    except Exception as e:
+        job["events"].append({"type": "error", "message": str(e)})
+        job["errored"] = True
+    finally:
+        job["done"] = True
+        if req.save and job.get("final") and not job.get("errored"):
+            try:
+                doc = {**job["final"], "_id": job["final"]["id"]}
+                del doc["id"]
+                await db.genius_prompts.insert_one(doc)
+            except Exception as e:
+                job["events"].append(
+                    {"type": "warning", "message": f"save_failed: {e}"}
+                )
+        # Schedule TTL cleanup so old jobs don't leak memory.
+        asyncio.create_task(_purge_studio_job(job_id))
+
+
+@app.post("/api/genius-prompt/jobs")
+async def create_genius_prompt_job(req: GeniusPromptRequest) -> dict[str, Any]:
+    job_id = uuid.uuid4().hex
+    _STUDIO_JOBS[job_id] = {
+        "events": [],
+        "done": False,
+        "errored": False,
+        "final": None,
+        "created_at": time.monotonic(),
+    }
+    asyncio.create_task(_run_studio_job(job_id, req))
+    return {"job_id": job_id}
+
+
+@app.get("/api/genius-prompt/jobs/{job_id}/events")
+async def stream_genius_prompt_job(
+    job_id: str,
+    cursor: int = 0,
+    pause_seconds: Optional[float] = None,
+) -> StreamingResponse:
+    if job_id not in _STUDIO_JOBS:
+        raise HTTPException(404, "job not found")
+
+    import json as _json
+
+    # Per-request override (used by tests to force fast reconnects);
+    # production callers omit the param and get the safe default.
+    pause_after = pause_seconds if pause_seconds is not None else _SSE_PAUSE_SECONDS
+
+    async def event_source() -> AsyncIterator[bytes]:
+        yield b": studio-job-open\n\n"
+        start = time.monotonic()
+        local_cursor = max(0, int(cursor))
+        last_heartbeat = time.monotonic()
+
+        while True:
+            job = _STUDIO_JOBS.get(job_id)
+            if job is None:
+                # TTL cleanup raced — close politely.
+                yield b"event: end\ndata: {}\n\n"
+                return
+
+            # Flush any buffered events at/after the cursor.
+            while local_cursor < len(job["events"]):
+                ev = job["events"][local_cursor]
+                local_cursor += 1
+                yield f"data: {_json.dumps(ev, ensure_ascii=False)}\n\n".encode("utf-8")
+                if ev.get("type") in ("final", "error"):
+                    yield b"event: end\ndata: {}\n\n"
+                    return
+
+            # Job completed but emitted no terminal event — close cleanly.
+            if job["done"]:
+                yield b"event: end\ndata: {}\n\n"
+                return
+
+            # Proactively close before the proxy's hard cap (~60s).
+            elapsed = time.monotonic() - start
+            if elapsed > pause_after:
+                yield (
+                    f"event: pause\ndata: {_json.dumps({'cursor': local_cursor})}\n\n"
+                ).encode("utf-8")
+                return
+
+            # Heartbeat every ~10s while waiting for the next event.
+            if time.monotonic() - last_heartbeat > 10:
+                yield b": heartbeat\n\n"
+                last_heartbeat = time.monotonic()
+
+            await asyncio.sleep(0.5)
+
+    return StreamingResponse(
+        event_source(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@app.get("/api/genius-prompt/jobs/{job_id}")
+async def get_genius_prompt_job(job_id: str) -> dict[str, Any]:
+    """Snapshot endpoint — useful for debugging or polling fallback."""
+    job = _STUDIO_JOBS.get(job_id)
+    if job is None:
+        raise HTTPException(404, "job not found")
+    return {
+        "job_id": job_id,
+        "done": job["done"],
+        "errored": job["errored"],
+        "event_count": len(job["events"]),
+        "final": job["final"],
+    }
+
+
+# ───────────── Test-only synthetic-job helper (no LLM) ─────────────
+#
+# Lets the reconnect-path pytest exercise the full job-queue + SSE-pause
+# flow without paying for a 60-200s real LLM run. The endpoint is named
+# with a `_test` segment so it never collides with production routes; it
+# does not require auth (preview env has no auth) and is harmless — it
+# just buffers synthetic events into _STUDIO_JOBS the same way the real
+# job runner does.
+
+
+class SyntheticJobRequest(BaseModel):
+    events: list[dict[str, Any]]
+    drip_ms: int = 200  # delay between events to force the wait-loop
+
+
+@app.post("/api/_test/genius-prompt/synthetic-job")
+async def create_synthetic_genius_job(req: SyntheticJobRequest) -> dict[str, Any]:
+    """Create a job whose events are drip-fed by a background task.
+
+    Tests use this to deterministically exercise the SSE reconnect path:
+    set `drip_ms` larger than the desired `pause_seconds` so the first
+    connection times out into `event: pause` before all events arrive.
+    """
+    job_id = uuid.uuid4().hex
+    _STUDIO_JOBS[job_id] = {
+        "events": [],
+        "done": False,
+        "errored": False,
+        "final": None,
+        "created_at": time.monotonic(),
+    }
+
+    async def _drip() -> None:
+        job = _STUDIO_JOBS[job_id]
+        try:
+            for ev in req.events:
+                await asyncio.sleep(req.drip_ms / 1000.0)
+                job["events"].append(ev)
+                if ev.get("type") == "final":
+                    job["final"] = ev.get("result")
+                if ev.get("type") == "error":
+                    job["errored"] = True
+        finally:
+            job["done"] = True
+            asyncio.create_task(_purge_studio_job(job_id))
+
+    asyncio.create_task(_drip())
+    return {"job_id": job_id}
+
+
+@app.get("/api/genius-prompts")
+async def genius_prompts_list() -> dict[str, Any]:
+    cursor = db.genius_prompts.find({}, sort=[("created_at", -1)]).limit(50)
+    items = []
+    async for d in cursor:
+        items.append(
+            {
+                "id": d["_id"],
+                "topic": d.get("topic"),
+                "platform": d.get("platform"),
+                "style": d.get("style"),
+                "language": d.get("language"),
+                "expected_quality_score": d.get("expected_quality_score"),
+                "confidence": d.get("confidence"),
+                "best_iteration": d.get("best_iteration"),
+                "created_at": d.get("created_at"),
+            }
+        )
+    return {"items": items}
+
+
+@app.get("/api/genius-prompts/{prompt_id}")
+async def genius_prompt_detail(prompt_id: str) -> dict[str, Any]:
+    d = await db.genius_prompts.find_one({"_id": prompt_id})
+    if not d:
+        raise HTTPException(404, "not found")
+    return {
+        "id": d.get("_id"),
+        "topic": d.get("topic"),
+        "platform": d.get("platform"),
+        "style": d.get("style"),
+        "language": d.get("language"),
+        "target_score": d.get("target_score"),
+        "best_iteration": d.get("best_iteration"),
+        "expected_quality_score": d.get("expected_quality_score"),
+        "genius_prompt": d.get("genius_prompt"),
+        "rationale": d.get("rationale"),
+        "focus_dimensions": d.get("focus_dimensions", []),
+        "evolution": d.get("evolution", []),
+        "confidence": d.get("confidence"),
+        "created_at": d.get("created_at"),
+    }
+
+
+@app.delete("/api/genius-prompts/{prompt_id}")
+async def genius_prompt_delete(prompt_id: str) -> dict[str, Any]:
+    res = await db.genius_prompts.delete_one({"_id": prompt_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "not found")
+    return {"deleted": True, "id": prompt_id}
+
+
+@app.get("/api/scripts")
+async def scripts_list() -> dict[str, Any]:
+    cursor = db.scripts.find({}, sort=[("created_at", -1)]).limit(50)
+    items = []
+    async for d in cursor:
+        items.append(
+            {
+                "id": d["_id"],
+                "topic": d.get("topic"),
+                "platform": d.get("platform"),
+                "style": d.get("style"),
+                "language": d.get("language"),
+                "hook": d.get("hook"),
+                "duration_sec": d.get("duration_sec"),
+                "genius_prompt_id": d.get("genius_prompt_id"),
+                "created_at": d.get("created_at"),
+            }
+        )
+    return {"items": items}
+
+
+@app.get("/api/scripts/{script_id}")
+async def script_detail(script_id: str) -> dict[str, Any]:
+    d = await db.scripts.find_one({"_id": script_id})
+    if not d:
+        raise HTTPException(404, "not found")
+    return {
+        "id": d.get("_id"),
+        "topic": d.get("topic"),
+        "platform": d.get("platform"),
+        "style": d.get("style"),
+        "language": d.get("language"),
+        "script": d.get("script"),
+        "hook": d.get("hook"),
+        "cta": d.get("cta"),
+        "tags": d.get("tags", []),
+        "duration_sec": d.get("duration_sec"),
+        "genius_prompt_id": d.get("genius_prompt_id"),
+        "created_at": d.get("created_at"),
+    }
+
+
+@app.delete("/api/scripts/{script_id}")
+async def script_delete(script_id: str) -> dict[str, Any]:
+    res = await db.scripts.delete_one({"_id": script_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "not found")
+    return {"deleted": True, "id": script_id}
+
+
+# ───────────────────────── Project Workspaces ─────────────────────────
+
+
+DEFAULT_WS_COLORS = ["#C9A84C", "#E8D5A3", "#8B6914", "#C0C0C0", "#F5F5F0"]
+
+
+@app.get("/api/workspaces")
+async def workspaces_list() -> dict[str, Any]:
+    cursor = db.workspaces.find({}, sort=[("created_at", 1)])
+    out = []
+    async for w in cursor:
+        wid = w["_id"]
+        sess_count = await db.sessions.count_documents({"workspace_id": wid})
+        crew_count = await db.crew_runs.count_documents({"workspace_id": wid})
+        mem_count = await memory_engine.count(workspace_id=wid)
+        out.append(
+            {
+                "id": wid,
+                "name": w.get("name"),
+                "description": w.get("description") or "",
+                "color": w.get("color") or DEFAULT_WS_COLORS[0],
+                "created_at": w.get("created_at"),
+                "updated_at": w.get("updated_at"),
+                "counts": {
+                    "memories": mem_count,
+                    "sessions": sess_count,
+                    "crew_runs": crew_count,
+                },
+            }
+        )
+    return {"workspaces": out}
+
+
+@app.post("/api/workspaces")
+async def workspaces_create(req: WorkspaceRequest) -> dict[str, Any]:
+    name = (req.name or "").strip()
+    if not name:
+        raise HTTPException(400, "name required")
+    wid = str(uuid.uuid4())
+    existing = await db.workspaces.count_documents({})
+    color = req.color or DEFAULT_WS_COLORS[existing % len(DEFAULT_WS_COLORS)]
+    doc = {
+        "_id": wid,
+        "name": name[:80],
+        "description": (req.description or "")[:280],
+        "color": color,
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+    }
+    await db.workspaces.insert_one(doc)
+    return {
+        "id": wid,
+        "name": doc["name"],
+        "description": doc["description"],
+        "color": doc["color"],
+        "created_at": doc["created_at"],
+        "updated_at": doc["updated_at"],
+        "counts": {"memories": 0, "sessions": 0, "crew_runs": 0},
+    }
+
+
+@app.patch("/api/workspaces/{workspace_id}")
+async def workspaces_update(workspace_id: str, req: WorkspaceRequest) -> dict[str, Any]:
+    updates: dict[str, Any] = {}
+    if req.name is not None:
+        n = req.name.strip()[:80]
+        if not n:
+            raise HTTPException(400, "name cannot be empty")
+        updates["name"] = n
+    if req.description is not None:
+        updates["description"] = req.description.strip()[:280]
+    if req.color is not None:
+        updates["color"] = req.color
+    if not updates:
+        raise HTTPException(400, "nothing to update")
+    updates["updated_at"] = now_iso()
+    result = await db.workspaces.update_one({"_id": workspace_id}, {"$set": updates})
+    if result.matched_count == 0:
+        raise HTTPException(404, "workspace not found")
+    w = await db.workspaces.find_one({"_id": workspace_id})
+    return {"id": workspace_id, **{k: w.get(k) for k in ("name", "description", "color")}}
+
+
+@app.delete("/api/workspaces/{workspace_id}")
+async def workspaces_delete(workspace_id: str, purge: bool = False) -> dict[str, Any]:
+    """Delete a workspace. If purge=true, also drop memories + sessions + crew runs.
+    Otherwise items keep their workspace_id but the container is gone."""
+    w = await db.workspaces.find_one({"_id": workspace_id})
+    if not w:
+        raise HTTPException(404, "workspace not found")
+
+    if purge:
+        # Delete all memories in this workspace
+        await memory_engine.clear_all(workspace_id=workspace_id)
+        # Delete sessions + their messages
+        sess_cursor = db.sessions.find({"workspace_id": workspace_id})
+        sess_ids = []
+        async for s in sess_cursor:
+            sess_ids.append(s["_id"])
+        if sess_ids:
+            await db.messages.delete_many({"session_id": {"$in": sess_ids}})
+            await db.sessions.delete_many({"_id": {"$in": sess_ids}})
+        # Delete crew runs
+        await db.crew_runs.delete_many({"workspace_id": workspace_id})
+
+    await db.workspaces.delete_one({"_id": workspace_id})
+    return {"id": workspace_id, "deleted": True, "purged": purge}
+
+
+# ───────────────────────── Streaming chat (SSE) ─────────────────────────
+
+
+@app.post("/api/chat/stream")
+async def chat_stream(req: ChatRequest):
+    """SSE streaming chat. Emits routing metadata then token deltas."""
+    session_id = req.session_id or str(uuid.uuid4())
+
+    existing = await db.sessions.find_one({"_id": session_id})
+    if not existing:
+        await db.sessions.insert_one(
+            {
+                "_id": session_id,
+                "created_at": now_iso(),
+                "updated_at": now_iso(),
+                "title": req.message[:60],
+                "force_tier": (req.force_tier or "").lower() or None,
+                "workspace_id": req.workspace_id or None,
+                "memory_enabled": True if req.memory_enabled is None else bool(req.memory_enabled),
+            }
+        )
+        memory_enabled = True if req.memory_enabled is None else bool(req.memory_enabled)
+        ws_id = req.workspace_id
+        reply_lang = None
+    else:
+        updates = {}
+        if req.force_tier is not None:
+            updates["force_tier"] = req.force_tier.lower() or None
+        if updates:
+            await db.sessions.update_one({"_id": session_id. "user_id": user_id}, {"$set": updates})
+        memory_enabled = existing.get("memory_enabled", True)
+        if req.memory_enabled is not None:
+            memory_enabled = bool(req.memory_enabled)
+        ws_id = existing.get("workspace_id") or req.workspace_id
+        reply_lang = existing.get("reply_lang")
+
+    await db.messages.insert_one(
+        {
+            "_id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "session_id": session_id,
+            "role": "user",
+            "content": req.message,
+            "created_at": now_iso(),
+        }
+    )
+
+    forced = TaskComplexity(req.force_tier.lower()) if req.force_tier else None
+    composed_message = apply_reply_lang(req.message, reply_lang)
+
+    async def event_generator() -> AsyncIterator[str]:
+        async for chunk in router_engine.route_and_stream(
+            composed_message,
+            session_id,
+            forced=forced,
+            workspace_id=ws_id,
+            memory_enabled=memory_enabled,
+        ):
+            yield chunk
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
